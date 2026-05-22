@@ -1,0 +1,315 @@
+---
+title: "Appstle Memberships Admin API Reference"
+description: "Appstle Memberships Admin API reference: membership contracts, member management, access control, and billing operations — authenticated with X-API-Key."
+---
+
+The Admin API gives you server-side access to every aspect of your membership program. Use it to retrieve member data, manage contracts, control access, trigger billing operations, and pull analytics — from your backend, mobile app, or any integration outside your Shopify storefront.
+
+**Base URL:** `https://membership-admin.appstle.com/api/external/v2/`
+
+**Authentication:** All requests require the `X-API-Key` header with a valid API key.
+
+```bash
+X-API-Key: apst_your-api-key-here
+```
+
+## Membership contracts
+
+### List membership contracts
+
+Retrieve membership contracts for a store, optionally filtered by customer.
+
+```
+GET /membership-contracts
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain (e.g., `your-store.myshopify.com`).
+    </ParamField>
+    <ParamField query="customerId" type="string">
+      Filter by Shopify customer ID. Returns only contracts belonging to this customer.
+    </ParamField>
+    <ParamField query="status" type="string">
+      Filter by contract status: `ACTIVE`, `PAUSED`, `CANCELLED`, `EXPIRED`, `FAILED`.
+    </ParamField>
+    <ParamField query="page" type="integer">
+      Page number for paginated results. Defaults to `0`.
+    </ParamField>
+    <ParamField query="size" type="integer">
+      Number of results per page. Defaults to `20`.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X GET \
+      "https://membership-admin.appstle.com/api/external/v2/membership-contracts?shop=your-store.myshopify.com&customerId=12345" \
+      -H "X-API-Key: apst_your-api-key-here"
+    ```
+  </Tab>
+  <Tab title="Example response">
+    ```json
+    {
+      "content": [
+        {
+          "id": 1001,
+          "status": "ACTIVE",
+          "membershipPlanName": "Gold Member",
+          "nextBillingDate": "2026-03-01",
+          "billingCycleType": "MONTHLY",
+          "startDate": "2026-01-01",
+          "endDate": null
+        }
+      ],
+      "totalElements": 1,
+      "totalPages": 1,
+      "number": 0,
+      "size": 20
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Get a membership contract
+
+Retrieve full details for a specific membership contract.
+
+```
+GET /membership-contracts/{contractId}
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField path="contractId" type="integer" required>
+      The numeric ID of the membership contract.
+    </ParamField>
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X GET \
+      "https://membership-admin.appstle.com/api/external/v2/membership-contracts/1001?shop=your-store.myshopify.com" \
+      -H "X-API-Key: apst_your-api-key-here"
+    ```
+  </Tab>
+</Tabs>
+
+## Member management
+
+### Check membership status
+
+Quickly verify whether a customer has an active membership. Use this before granting access to gated content or applying member pricing.
+
+```
+GET /membership-status
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain.
+    </ParamField>
+    <ParamField query="customerId" type="string" required>
+      Shopify customer ID to check.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X GET \
+      "https://membership-admin.appstle.com/api/external/v2/membership-status?shop=your-store.myshopify.com&customerId=12345" \
+      -H "X-API-Key: apst_your-api-key-here"
+    ```
+  </Tab>
+</Tabs>
+
+## Membership plans
+
+### List membership plans
+
+Retrieve all membership plans configured for a store, including plan names, billing intervals, pricing, and associated customer tags.
+
+```
+GET /membership-plans
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X GET \
+      "https://membership-admin.appstle.com/api/external/v2/membership-plans?shop=your-store.myshopify.com" \
+      -H "X-API-Key: apst_your-api-key-here"
+    ```
+  </Tab>
+  <Tab title="Example response">
+    ```json
+    [
+      {
+        "id": 101,
+        "name": "Gold Member",
+        "billingCycleType": "MONTHLY",
+        "price": 29.00,
+        "currencyCode": "USD",
+        "customerTag": "gold-member",
+        "orderTag": "membership-order"
+      },
+      {
+        "id": 102,
+        "name": "Platinum Member",
+        "billingCycleType": "ANNUAL",
+        "price": 249.00,
+        "currencyCode": "USD",
+        "customerTag": "platinum-member",
+        "orderTag": "platinum-membership-order"
+      }
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+## Billing operations
+
+### Cancel a membership
+
+Cancel a customer's membership contract programmatically. The cancellation reason is recorded in the contract's activity log.
+
+```
+POST /membership-contracts/{contractId}/cancel
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField path="contractId" type="integer" required>
+      The numeric ID of the membership contract to cancel.
+    </ParamField>
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain.
+    </ParamField>
+    <ParamField body="reason" type="string">
+      A human-readable cancellation reason. Recorded in the activity log for audit purposes.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X POST \
+      "https://membership-admin.appstle.com/api/external/v2/membership-contracts/1001/cancel?shop=your-store.myshopify.com" \
+      -H "X-API-Key: apst_your-api-key-here" \
+      -H "Content-Type: application/json" \
+      -d '{"reason": "Customer requested cancellation via support ticket"}'
+    ```
+  </Tab>
+</Tabs>
+
+### Pause a membership
+
+Pause an active membership. The customer retains or loses access based on the store's `immediateTagRemoveOnPause` setting.
+
+```
+POST /membership-contracts/{contractId}/pause
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField path="contractId" type="integer" required>
+      The numeric ID of the membership contract to pause.
+    </ParamField>
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X POST \
+      "https://membership-admin.appstle.com/api/external/v2/membership-contracts/1001/pause?shop=your-store.myshopify.com" \
+      -H "X-API-Key: apst_your-api-key-here"
+    ```
+  </Tab>
+</Tabs>
+
+### Resume a paused membership
+
+Reactivate a membership that was previously paused. The customer's access tag is re-applied immediately.
+
+```
+POST /membership-contracts/{contractId}/resume
+```
+
+<Tabs>
+  <Tab title="Parameters">
+    <ParamField path="contractId" type="integer" required>
+      The numeric ID of the paused membership contract to resume.
+    </ParamField>
+    <ParamField query="shop" type="string" required>
+      Your store's Shopify domain.
+    </ParamField>
+  </Tab>
+  <Tab title="Example request">
+    ```bash
+    curl -X POST \
+      "https://membership-admin.appstle.com/api/external/v2/membership-contracts/1001/resume?shop=your-store.myshopify.com" \
+      -H "X-API-Key: apst_your-api-key-here"
+    ```
+  </Tab>
+</Tabs>
+
+## Response fields
+
+<ResponseField name="id" type="integer">
+  Internal numeric ID of the membership contract.
+</ResponseField>
+<ResponseField name="status" type="string">
+  Current contract status. One of: `ACTIVE`, `PAUSED`, `CANCELLED`, `EXPIRED`, `FAILED`.
+</ResponseField>
+<ResponseField name="membershipPlanName" type="string">
+  Display name of the membership plan (e.g., "Gold Member").
+</ResponseField>
+<ResponseField name="nextBillingDate" type="string">
+  ISO 8601 date of the next scheduled renewal billing.
+</ResponseField>
+<ResponseField name="billingCycleType" type="string">
+  Billing frequency: `MONTHLY`, `ANNUAL`, or a custom interval.
+</ResponseField>
+<ResponseField name="startDate" type="string">
+  ISO 8601 date when the membership contract began.
+</ResponseField>
+<ResponseField name="endDate" type="string">
+  ISO 8601 date when the membership ends. `null` for open-ended contracts.
+</ResponseField>
+<ResponseField name="totalElements" type="integer">
+  Total number of contracts matching the query (used for pagination).
+</ResponseField>
+<ResponseField name="totalPages" type="integer">
+  Total number of pages available given the current page size.
+</ResponseField>
+
+## Error responses
+
+All error responses follow a consistent structure:
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid API key provided",
+  "status": 401
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Bad Request — missing or invalid parameters |
+| `401` | Unauthorized — invalid or missing API key |
+| `403` | Forbidden — API key lacks required permissions |
+| `404` | Not Found — contract or resource does not exist |
+| `429` | Too Many Requests — rate limit exceeded; use exponential backoff |
+| `500` | Server Error — contact support@appstle.com |
+
+## Rate limits
+
+Requests are rate-limited per store. If you receive a `429` response, implement exponential backoff and retry after a delay. Cache membership status per customer session where possible to minimize API calls.

@@ -1,0 +1,156 @@
+{
+  "projectType": "saas",
+  "projectName": "Appstle",
+  "projectDescription": "Appstle is a Shopify app suite providing enterprise-grade subscriptions, loyalty programs, and memberships with REST APIs, webhooks, and Shopify Flow integrations.",
+  "theme": "luma",
+  "primaryColor": "#0caceb",
+  "lightColor": "#6ccdf2",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Subscriptions",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "subscription/introduction",
+              "subscription/authentication",
+              "subscription/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "subscription/integration-guide",
+              "subscription/shopify-flow",
+              "subscription/javascript-hooks",
+              "subscription/metafields-and-tags"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "subscription/webhooks"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "subscription/admin-api",
+              "subscription/storefront-api"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "subscription/faq"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Loyalty",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "loyalty/introduction",
+              "loyalty/authentication",
+              "loyalty/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "loyalty/integration-guide",
+              "loyalty/shopify-flow",
+              "loyalty/metafields-and-tags"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "loyalty/webhooks"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "loyalty/admin-api",
+              "loyalty/storefront-api"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Memberships",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "memberships/introduction",
+              "memberships/authentication",
+              "memberships/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "memberships/integration-guide",
+              "memberships/shopify-flow",
+              "memberships/metafields-and-tags"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "memberships/webhooks"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "memberships/admin-api",
+              "memberships/customer-portal-api"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Subscription lifecycle management (create, pause, cancel, resume)",
+    "Billing & payment processing with automatic retry logic",
+    "Loyalty points program with VIP tiers and referral tracking",
+    "Membership plans with gated content and access control",
+    "Shopify Flow native integration with triggers and actions",
+    "Real-time webhooks powered by Svix with signature verification",
+    "Customer self-service portal via Shopify App Proxy",
+    "JavaScript hooks for storefront widget customization",
+    "Shopify metafields and customer/order tags",
+    "Partner integration key program for third-party apps"
+  ],
+  "publicApiSurface": [
+    "GET /api/external/v2/subscription-customers/{customerId}",
+    "GET /api/external/v2/subscription-contract-details",
+    "PUT /api/external/v2/subscription-contracts-update-status",
+    "PUT /api/external/v2/subscription-contracts-update-billing-date",
+    "PUT /api/external/v2/subscription-contracts-add-line-item",
+    "PUT /api/external/v2/subscription-contracts-remove-line-item",
+    "DELETE /api/external/v2/subscription-contracts/{contractId}",
+    "PUT /api/external/v2/subscription-billing-attempts/skip-order/{billingAttemptId}",
+    "GET /api/external/customer-loyalty",
+    "POST /api/external/add-points",
+    "POST /api/external/redeem-points",
+    "GET /api/external/v2/membership-contracts",
+    "Webhook: subscription.created",
+    "Webhook: subscription.billing-success",
+    "Webhook: subscription.billing-failure",
+    "Shopify Flow Trigger: Subscription Created",
+    "Shopify Flow Trigger: Subscription Billing Success",
+    "Shopify Flow Action: Update Subscription Status",
+    "Shopify Flow Action: Apply Discount Code",
+    "JavaScript Event: AppstleSubscription:SubscriptionWidget:SellingPlanSelected"
+  ]
+}

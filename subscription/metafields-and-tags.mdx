@@ -1,0 +1,335 @@
+---
+title: "Shopify metafields and tags for Appstle Subscriptions"
+sidebarTitle: "Metafields & tags"
+description: "Reference for all Appstle Subscriptions metafields (namespace, keys, types) and customer/order tags, including Liquid template support for dynamic tag values."
+---
+
+Appstle Subscriptions uses Shopify metafields and tags to store subscription data, power the storefront widget, and enable automation workflows. All metafields use the namespace `appstle_subscription` without an `$app:` prefix, which means they are publicly readable by other apps, themes, and Liquid templates.
+
+## Metafields overview
+
+Metafields are set on four Shopify resource types:
+
+| Resource | Keys | Visibility | Purpose |
+|----------|------|------------|---------|
+| Shop | 15+ | Public | Widget settings, selling plans, Build-a-Box configuration |
+| Selling Plan | 1 | Public | Individual selling plan metadata |
+| Order | 1 | Public | Subscription context for each order |
+| Customer | 1 | Public | All subscription contracts for the customer |
+
+## Shop metafields
+
+Shop metafields store the app's configuration and are written whenever a merchant saves settings in the Appstle admin. Updates are synchronous (immediate).
+
+### `appstle_subscription` / `setting`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Purpose | Core widget and app configuration — UI settings, asset paths, selling plans, labels, and validation rules |
+| Updated when | Merchant saves settings |
+
+```json
+{
+  "widgetEnabled": true,
+  "sellingPlans": [],
+  "assetPaths": {
+    "js": "https://cdn.appstle.com/...",
+    "css": "https://cdn.appstle.com/..."
+  },
+  "labels": {},
+  "validationRules": {}
+}
+```
+
+### `appstle_subscription` / `labels`
+
+| Property | Value |
+|----------|-------|
+| Type | `multi_line_text_field` |
+| Purpose | Localized UI labels and translations for the subscription widget |
+| Updated when | Merchant saves label translations |
+
+### `appstle_subscription` / `shop_info`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Purpose | Shop metadata including money format, feature flags, and API tokens |
+
+### `appstle_subscription` / `selling_plans`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Purpose | Free-product selling plans only |
+
+### `appstle_subscription` / `all_Selling_Plans`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Purpose | All selling plans including paid plans |
+
+<Note>
+  The key uses mixed case (`all_Selling_Plans`) — this is intentional and must not be changed.
+</Note>
+
+### `appstle_subscription` / `checkout_validation`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Purpose | Checkout validation rules including duplicate subscription restrictions and per-customer limits |
+
+```json
+{
+  "preventDuplicateSubscriptions": true,
+  "maxSubscriptionsPerCustomer": 5,
+  "rules": []
+}
+```
+
+### Widget templates
+
+| Key | Type | Purpose |
+|-----|------|---------|
+| `widget_template_html` | `multi_line_text_field` | Custom widget template HTML (only set when a custom template is configured) |
+| `all_widget_template_html` | `json` | Map of all available widget templates |
+
+### Build-a-Box metafields
+
+| Key | Type | Purpose |
+|-----|------|---------|
+| `bundle` | `json` | Bundle/Build-a-Box configuration |
+| `bab_subscription_css` | `json` | Build-a-Box subscription CSS styles |
+| `bab_customization_css` | `json` | Build-a-Box customization CSS |
+| `bab_validation_info` | `json` | Build-a-Box validation rules |
+| `bab_setting_info` | `json` | Build-a-Box settings |
+| `bab_info_0`, `bab_info_1`, … | `json` | Individual bundle details, one per enabled bundle (zero-indexed) |
+| `total_bab` | `integer` | Total count of enabled Build-a-Box bundles |
+
+<Info>
+  The `bab_info_*` keys are zero-indexed. A store with three bundles has keys `bab_info_0`, `bab_info_1`, and `bab_info_2`.
+</Info>
+
+## Selling plan metafields
+
+### `appstle_subscription` / `selling_plan`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Selling Plan |
+| Purpose | Individual selling plan metadata — frequency, billing policy, discounts |
+| Updated when | Selling plan is created or modified |
+
+```json
+{
+  "frequencyCount": 1,
+  "frequencyInterval": "MONTH",
+  "billingPolicy": {
+    "interval": "MONTH",
+    "intervalCount": 1
+  },
+  "discountType": "PERCENTAGE",
+  "discountValue": 10.0
+}
+```
+
+## Order metafields
+
+### `appstle_subscription` / `details`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Order |
+| Purpose | Full subscription contract context at the time the order was created |
+| Updated when | Order is created via subscription (initial or recurring billing) |
+| Update timing | Asynchronous — typically a few seconds after the order is created |
+
+```json
+{
+  "customer": {
+    "id": "gid://shopify/Customer/1234567890"
+  },
+  "subscriptionContract": {
+    "id": "gid://shopify/SubscriptionContract/9876543210",
+    "status": "ACTIVE",
+    "sellingPlanIds": ["gid://shopify/SellingPlan/111"],
+    "sellingPlanNames": ["Monthly Subscription - 10% off"],
+    "variantIds": ["gid://shopify/ProductVariant/222"],
+    "variantNames": ["Default Title"],
+    "currentCycle": 3,
+    "groupPlanNames": ["Subscribe & Save"],
+    "cancellationReason": null
+  },
+  "lineItems": [
+    {
+      "variantId": "gid://shopify/ProductVariant/222",
+      "title": "Premium Coffee Beans",
+      "productId": "gid://shopify/Product/333",
+      "sellingPlanId": "gid://shopify/SellingPlan/111",
+      "sellingPlanName": "Monthly Subscription - 10% off",
+      "sku": "COFFEE-PREMIUM-1KG"
+    }
+  ],
+  "firstOrder": {
+    "id": "gid://shopify/Order/444",
+    "createdAt": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+## Customer metafields
+
+### `appstle_subscription` / `subscriptions`
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Customer |
+| Purpose | All subscription contracts for this customer with full details |
+| Updated when | Any contract changes — created, updated, paused, cancelled, billing attempt |
+| Update timing | Asynchronous — typically a few seconds after any contract change |
+
+```json
+[
+  {
+    "id": "gid://shopify/SubscriptionContract/9876543210",
+    "status": "ACTIVE",
+    "sellingPlanNames": ["Monthly Subscription - 10% off"],
+    "nextBillingDate": "2025-04-15T10:30:00Z",
+    "lineItems": [
+      {
+        "title": "Premium Coffee Beans",
+        "variantId": "gid://shopify/ProductVariant/222",
+        "sku": "COFFEE-PREMIUM-1KG"
+      }
+    ]
+  }
+]
+```
+
+<Warning>
+  Customer metafield updates are **asynchronous**. There may be a delay of a few seconds between a contract change and the metafield reflecting that change. Do not rely on this metafield for real-time data in time-sensitive operations.
+</Warning>
+
+## Using metafields in Liquid
+
+All metafields use the `appstle_subscription` namespace without an `$app:` prefix, so they are accessible directly in Liquid:
+
+```liquid
+{{ shop.metafields.appstle_subscription.setting }}
+{{ customer.metafields.appstle_subscription.subscriptions }}
+```
+
+## Order tags
+
+Order tags are static strings applied to identify the type of subscription order. They are never removed once applied.
+
+| Tag | Config field | Default value | Applied when |
+|-----|-------------|---------------|--------------|
+| First-time order | `firstTimeOrderTag` | `appstle_subscription_first_order` | Initial subscription order is created |
+| Recurring order | `recurringOrderTag` | `appstle_subscription_recurring_order` | Each subsequent billing order is created |
+
+Configure tags in **Appstle Admin → Settings → Order Tags**.
+
+<Tip>
+  If you need to apply tags to orders created before you configured tags, use the `applyMissedOrderTags` API endpoint to backfill them.
+</Tip>
+
+## Customer tags
+
+Customer tags are dynamic — they change as subscription status changes. They follow a strict priority hierarchy: **Active > Paused > Inactive**. Only one status tag is active at a time.
+
+| Status | Condition | Config field | Default value |
+|--------|-----------|-------------|---------------|
+| Active | Customer has 1+ active contracts | `customerActiveSubscriptionTag` | `appstle_subscription_active_customer` |
+| Paused | Customer has paused contracts but no active ones | `customerPausedSubscriptionTag` | `appstle_subscription_paused_customer` |
+| Inactive | All contracts cancelled | `customerInActiveSubscriptionTag` | `appstle_subscription_inactive_customer` |
+
+Tags are updated on every subscription lifecycle event: contract created, paused, resumed, cancelled, and billing attempts.
+
+### Liquid template variables
+
+Customer tags support Liquid template syntax. Wrap variables in double curly braces:
+
+```
+active_subscriber_{{contract.sellingPlanNames}}
+```
+
+**Available variables:**
+
+| Variable | Type | Description | Example |
+|----------|------|-------------|---------|
+| `{{customer.id}}` | String | Shopify customer GID | `gid://shopify/Customer/1234567890` |
+| `{{contract.id}}` | String | Subscription contract GID | `gid://shopify/SubscriptionContract/9876` |
+| `{{contract.sellingPlanIds}}` | String | Comma-separated selling plan IDs | `gid://shopify/SellingPlan/111` |
+| `{{contract.sellingPlanNames}}` | String | Comma-separated selling plan names | `Monthly Subscription - 10% off` |
+| `{{contract.variantIds}}` | String | Comma-separated variant IDs | `gid://shopify/ProductVariant/222` |
+| `{{contract.variantNames}}` | String | Comma-separated variant names | `Default Title` |
+| `{{contract.currentCycle}}` | Number | Current billing cycle number | `3` |
+| `{{contract.cancellationReason}}` | String | Cancellation reason if cancelled | `Too expensive` |
+| `{{order.id}}` | String | First order GID | `gid://shopify/Order/444` |
+| `{{order.createdAt}}` | String | First order creation date (ISO 8601) | `2025-01-15T10:30:00Z` |
+
+**Template examples:**
+
+```
+# Static tag (default behavior)
+appstle_subscription_active_customer
+
+# Dynamic tag with selling plan name
+active_subscriber_{{contract.sellingPlanNames}}
+# Result: active_subscriber_Monthly Subscription - 10% off
+
+# Dynamic tag with cycle count
+subscriber_cycle_{{contract.currentCycle}}
+# Result: subscriber_cycle_3
+
+# Dynamic tag with variant name
+subscribed_to_{{contract.variantNames}}
+# Result: subscribed_to_Default Title
+```
+
+## Complete metafield reference
+
+| Resource | Namespace | Key | Type |
+|----------|-----------|-----|------|
+| Shop | `appstle_subscription` | `setting` | json |
+| Shop | `appstle_subscription` | `widget_template_html` | multi_line_text_field |
+| Shop | `appstle_subscription` | `all_widget_template_html` | json |
+| Shop | `appstle_subscription` | `bundle` | json |
+| Shop | `appstle_subscription` | `labels` | multi_line_text_field |
+| Shop | `appstle_subscription` | `selling_plans` | json |
+| Shop | `appstle_subscription` | `checkout_validation` | json |
+| Shop | `appstle_subscription` | `bab_subscription_css` | json |
+| Shop | `appstle_subscription` | `bab_customization_css` | json |
+| Shop | `appstle_subscription` | `shop_info` | json |
+| Shop | `appstle_subscription` | `bab_validation_info` | json |
+| Shop | `appstle_subscription` | `bab_setting_info` | json |
+| Shop | `appstle_subscription` | `all_Selling_Plans` | json |
+| Shop | `appstle_subscription` | `bab_info_[0-N]` | json |
+| Shop | `appstle_subscription` | `total_bab` | integer |
+| Selling Plan | `appstle_subscription` | `selling_plan` | json |
+| Order | `appstle_subscription` | `details` | json |
+| Customer | `appstle_subscription` | `subscriptions` | json |
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Can I read subscription metafields from my Liquid theme?">
+    Yes. All subscription metafields use the `appstle_subscription` namespace without an `$app:` prefix, so they are accessible in Liquid via `{{ shop.metafields.appstle_subscription.setting }}`, `{{ customer.metafields.appstle_subscription.subscriptions }}`, and so on.
+  </Accordion>
+  <Accordion title="How quickly are customer metafields updated after a contract change?">
+    Customer metafield updates are processed asynchronously. Typical latency is a few seconds, but during high-traffic periods it may take a bit longer.
+  </Accordion>
+  <Accordion title="What happens to customer tags when a customer has multiple subscriptions?">
+    Tags follow the priority hierarchy Active > Paused > Inactive. If a customer has both active and paused subscriptions, the active tag takes precedence. The inactive tag is only applied when all contracts are cancelled.
+  </Accordion>
+  <Accordion title="Can I backfill order tags for existing orders?">
+    Yes. Use the `applyMissedOrderTags` API endpoint to apply tags to orders that were created before your tag configuration was set up.
+  </Accordion>
+</AccordionGroup>

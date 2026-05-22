@@ -1,0 +1,126 @@
+---
+title: "Appstle Subscriptions: Recurring Revenue for Shopify"
+sidebarTitle: "Introduction"
+description: "Learn how Appstle Subscriptions works, when to use the Admin API vs. the Storefront API, and what you can build with each interface."
+---
+
+Appstle Subscriptions gives Shopify merchants a complete platform for selling and managing recurring products. Once you install the app, Shopify stores subscription contracts natively — and Appstle exposes two REST API surfaces so you can build integrations, automation workflows, custom portals, and more on top of that data.
+
+## Available APIs
+
+<CardGroup cols={2}>
+  <Card title="Admin API" icon="server" href="/subscription/admin-api">
+    Server-side REST API authenticated with `X-API-Key`. Use this for backend integrations, mobile apps, automated workflows, bulk operations, and any use case that runs outside a customer's browser session.
+  </Card>
+  <Card title="Storefront API" icon="user" href="/subscription/storefront-api">
+    Customer-facing REST API accessed via Shopify App Proxy. Requires a logged-in customer session — no API key. Use this to build custom subscription portals directly on your storefront.
+  </Card>
+</CardGroup>
+
+## Which API should you use?
+
+<Tabs>
+  <Tab title="Use the Admin API when…">
+    - You are building a **server-side integration** (backend service, CRM connector, helpdesk plugin)
+    - You are building a **mobile app** (iOS or Android)
+    - You need to **manage subscriptions programmatically** on behalf of merchants
+    - You want to run **bulk operations** or scheduled automation
+    - You are building an **admin dashboard** or reporting tool
+    - Your code runs **anywhere outside a customer's browser** on the storefront
+
+    <Info>
+      Admin API requests require an `X-API-Key` header. Keys are created in the Appstle dashboard under **Settings → API Key Management**. Never expose keys in client-side code.
+    </Info>
+  </Tab>
+  <Tab title="Use the Storefront API when…">
+    - You are building a **custom customer portal** hosted on your Shopify storefront
+    - You want customers to **self-manage their subscriptions** (skip, pause, swap products, update payment)
+    - Your code runs **inside the storefront** with a logged-in customer session
+    - You are customizing the subscription portal **theme or appearance**
+
+    <Warning>
+      Storefront APIs run exclusively through Shopify's App Proxy and require the customer to be logged in. They will not accept API key authentication and cannot be called from a backend server.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Subscription management" icon="rotate">
+    Create, update, pause, resume, and cancel subscription contracts. Full lifecycle control from initial checkout through cancellation.
+  </Card>
+  <Card title="Billing & payments" icon="credit-card">
+    Process payments, handle billing failures, update payment methods, and manage billing cycles and retry logic.
+  </Card>
+  <Card title="Product catalog" icon="box">
+    Configure subscription-eligible products, manage selling plans, handle product swaps, and set up Build-a-Box bundles.
+  </Card>
+  <Card title="Order fulfillment" icon="truck">
+    Manage subscription order cycles, skip upcoming orders, reschedule billing dates, and control delivery schedules.
+  </Card>
+  <Card title="Reporting & analytics" icon="chart-bar">
+    Access revenue metrics, billing history, order counts per subscription contract, and detailed past-order reports.
+  </Card>
+  <Card title="Loyalty & rewards" icon="star">
+    Integrate loyalty programs that let customers earn and redeem points on their subscription orders.
+  </Card>
+  <Card title="Customization" icon="palette">
+    Apply custom CSS, configure label translations, and manage theme settings for the storefront widget and customer portal.
+  </Card>
+  <Card title="Automation" icon="bolt">
+    Connect with Shopify Flow, listen to JavaScript storefront events, and receive real-time webhook notifications.
+  </Card>
+</CardGroup>
+
+## Base URL
+
+All Admin API endpoints use:
+
+```
+https://subscription-admin.appstle.com/api/external/v2/
+```
+
+Storefront API endpoints are accessed through your store's Shopify App Proxy — no separate base URL is needed.
+
+## HTTP status codes
+
+All API responses use standard HTTP status codes.
+
+| Code | Meaning |
+|------|---------|
+| `200` | Success |
+| `201` | Resource created |
+| `400` | Bad request — invalid parameters |
+| `401` | Unauthorized — missing or invalid API key |
+| `403` | Forbidden — key lacks required permissions |
+| `404` | Not found |
+| `429` | Rate limit exceeded |
+| `500` | Server error |
+
+Error responses follow this shape:
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid API key provided",
+  "status": 401
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/subscription/authentication">
+    Create API keys and learn how to authenticate every request.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/subscription/quickstart">
+    Make your first API call in under five minutes.
+  </Card>
+  <Card title="Integration guide" icon="book" href="/subscription/integration-guide">
+    End-to-end walkthrough covering the most common integration workflows.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/subscription/webhooks">
+    Receive real-time event notifications when subscriptions change.
+  </Card>
+</CardGroup>

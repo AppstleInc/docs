@@ -1,0 +1,414 @@
+---
+title: "Appstle Subscriptions webhook events and setup"
+sidebarTitle: "Webhooks"
+description: "Configure webhook endpoints to receive real-time subscription events, verify Svix signatures, handle retries, and troubleshoot delivery failures."
+---
+
+Webhooks let you receive real-time HTTP notifications when subscription events happen in your Appstle account. Instead of polling the API, you register an endpoint URL and Appstle sends an HTTP POST request to it whenever an event occurs.
+
+Appstle webhooks are powered by [Svix](https://www.svix.com/), which provides automatic retries with exponential backoff, cryptographic signature verification, and detailed delivery logs.
+
+## Getting started
+
+<Steps>
+  <Step title="Configure your endpoint">
+    Log in to your Appstle dashboard, go to **Settings → Webhooks**, add your webhook endpoint URL, and select which events you want to receive.
+  </Step>
+  <Step title="Return 2xx quickly">
+    Your endpoint must return a `2xx` status code (e.g. `200 OK`) to acknowledge receipt. Process the event asynchronously in a background job — slow responses will time out and trigger retries.
+  </Step>
+  <Step title="Verify signatures">
+    Every webhook request includes Svix signature headers. Always verify the signature before processing to ensure the request is authentic. See [Signature verification](#signature-verification) below.
+  </Step>
+</Steps>
+
+## Event types
+
+| Event type | Description | Payload type |
+|------------|-------------|--------------|
+| `subscription.created` | New subscription created | Subscription contract |
+| `subscription.updated` | Subscription details updated | Subscription contract |
+| `subscription.activated` | Subscription activated | Subscription contract |
+| `subscription.paused` | Subscription paused | Subscription contract |
+| `subscription.cancelled` | Subscription cancelled | Subscription contract |
+| `subscription.next-order-date-changed` | Next order date modified | Subscription contract |
+| `subscription.billing-interval-changed` | Billing frequency changed | Subscription contract |
+| `subscription.billing-success` | Payment processed successfully | Billing attempt |
+| `subscription.billing-failure` | Payment failed | Billing attempt |
+| `subscription.billing-skipped` | Billing cycle skipped | Billing attempt |
+| `subscription.upcoming-order-notification` | Upcoming order reminder sent | Billing attempt |
+
+## Payload structure
+
+All webhooks use this envelope:
+
+```json
+{
+  "type": "subscription.created",
+  "data": {
+    // Event-specific payload
+  }
+}
+```
+
+## Subscription contract payloads
+
+The following events carry a full subscription contract in `data`:
+`subscription.created`, `subscription.updated`, `subscription.activated`, `subscription.paused`, `subscription.cancelled`, `subscription.next-order-date-changed`, `subscription.billing-interval-changed`
+
+<Accordion title="Complete subscription contract payload example">
+
+```json
+{
+  "type": "subscription.created",
+  "data": {
+    "id": "gid://shopify/SubscriptionContract/12345",
+    "createdAt": "2026-01-15T10:30:00Z",
+    "updatedAt": "2026-01-15T10:30:00Z",
+    "nextBillingDate": "2026-02-15",
+    "status": "ACTIVE",
+    "deliveryPrice": {
+      "amount": "5.00",
+      "currencyCode": "USD"
+    },
+    "lastPaymentStatus": "SUCCEEDED",
+    "billingPolicy": {
+      "interval": "MONTH",
+      "intervalCount": 1,
+      "anchors": [{ "type": "MONTHDAY", "day": 15, "month": null, "cutoffDay": null }],
+      "maxCycles": null,
+      "minCycles": null
+    },
+    "deliveryPolicy": {
+      "interval": "MONTH",
+      "intervalCount": 1,
+      "anchors": [{ "type": "MONTHDAY", "day": 15, "month": null, "cutoffDay": null }]
+    },
+    "lines": {
+      "nodes": [
+        {
+          "id": "gid://shopify/SubscriptionLine/67890",
+          "productId": "gid://shopify/Product/11111",
+          "variantId": "gid://shopify/ProductVariant/22222",
+          "sellingPlanId": "gid://shopify/SellingPlan/33333",
+          "sellingPlanName": "Subscribe & Save 10%",
+          "title": "Premium Coffee Beans",
+          "variantTitle": "1lb / Medium Roast",
+          "sku": "COFFEE-1LB-MED",
+          "quantity": 2,
+          "taxable": true,
+          "currentPrice": { "amount": "27.00", "currencyCode": "USD" },
+          "lineDiscountedPrice": { "amount": "24.30", "currencyCode": "USD" },
+          "pricingPolicy": {
+            "basePrice": { "amount": "30.00", "currencyCode": "USD" },
+            "cycleDiscounts": [
+              {
+                "afterCycle": 0,
+                "adjustmentType": "PERCENTAGE",
+                "adjustmentValue": { "percentage": 10.0 },
+                "computedPrice": { "amount": "27.00", "currencyCode": "USD" }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "customer": {
+      "id": "gid://shopify/Customer/55555",
+      "email": "customer@example.com",
+      "displayName": "John Doe",
+      "firstName": "John",
+      "lastName": "Doe",
+      "phone": "+1-555-123-4567"
+    },
+    "customerPaymentMethod": {
+      "id": "gid://shopify/CustomerPaymentMethod/66666",
+      "instrument": {
+        "__typename": "CustomerCreditCard",
+        "brand": "VISA",
+        "expiresSoon": false,
+        "expiryMonth": 12,
+        "expiryYear": 2028,
+        "lastDigits": "4242",
+        "maskedNumber": "•••• •••• •••• 4242",
+        "name": "John Doe"
+      }
+    },
+    "deliveryMethod": {
+      "__typename": "SubscriptionDeliveryMethodShipping",
+      "address": {
+        "firstName": "John",
+        "lastName": "Doe",
+        "address1": "123 Main Street",
+        "city": "San Francisco",
+        "province": "California",
+        "country": "United States",
+        "zip": "94102"
+      },
+      "shippingOption": {
+        "title": "Standard Shipping",
+        "code": "STANDARD"
+      }
+    }
+  }
+}
+```
+
+</Accordion>
+
+### Subscription contract fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | String | Shopify GraphQL ID of the subscription contract |
+| `status` | Enum | `ACTIVE`, `PAUSED`, `CANCELLED`, `EXPIRED`, or `FAILED` |
+| `nextBillingDate` | Date | ISO 8601 date of next billing (`YYYY-MM-DD`) |
+| `createdAt` | DateTime | ISO 8601 timestamp when subscription was created |
+| `updatedAt` | DateTime | ISO 8601 timestamp of last update |
+| `lastPaymentStatus` | Enum | `SUCCEEDED`, `FAILED`, or null |
+| `billingPolicy.interval` | Enum | `DAY`, `WEEK`, `MONTH`, or `YEAR` |
+| `billingPolicy.intervalCount` | Integer | Number of intervals between billings |
+| `billingPolicy.maxCycles` | Integer | Maximum billing cycles (null = unlimited) |
+| `billingPolicy.minCycles` | Integer | Minimum billing cycles before cancellation is allowed |
+| `lines.nodes` | Array | Subscription line items |
+| `customer` | Object | Customer details |
+| `customerPaymentMethod` | Object | Payment method (credit card, PayPal, or Shop Pay) |
+| `deliveryMethod` | Object | Delivery method (shipping, local delivery, or pickup) |
+| `discounts.nodes` | Array | Applied discounts |
+| `note` | String | Internal subscription note |
+| `customAttributes` | Array | Custom key-value attributes |
+
+## Billing attempt payloads
+
+The following events carry billing attempt data:
+`subscription.billing-success`, `subscription.billing-failure`, `subscription.billing-skipped`, `subscription.upcoming-order-notification`
+
+<Tabs>
+  <Tab title="billing-success">
+
+```json
+{
+  "type": "subscription.billing-success",
+  "data": {
+    "id": 98765,
+    "shop": "example-store.myshopify.com",
+    "billingAttemptId": "gid://shopify/SubscriptionBillingAttempt/99999",
+    "contractId": 12345,
+    "status": "SUCCESS",
+    "billingDate": "2026-02-15T00:00:00Z",
+    "attemptTime": "2026-02-15T10:30:00Z",
+    "attemptCount": 1,
+    "graphOrderId": "gid://shopify/Order/77777",
+    "orderId": 77777,
+    "orderName": "#1002",
+    "orderAmount": 59.30,
+    "retryingNeeded": false,
+    "upcomingOrderEmailSentStatus": "SENT"
+  }
+}
+```
+
+  </Tab>
+  <Tab title="billing-failure">
+
+```json
+{
+  "type": "subscription.billing-failure",
+  "data": {
+    "id": 98766,
+    "shop": "example-store.myshopify.com",
+    "billingAttemptId": "gid://shopify/SubscriptionBillingAttempt/99998",
+    "contractId": 12345,
+    "status": "FAILURE",
+    "billingDate": "2026-03-15T00:00:00Z",
+    "attemptTime": "2026-03-15T10:30:00Z",
+    "attemptCount": 1,
+    "graphOrderId": null,
+    "orderId": null,
+    "retryingNeeded": true,
+    "transactionFailedEmailSentStatus": "SENT",
+    "billingAttemptResponseMessage": "INVALID_PAYMENT_METHOD: The payment method is invalid. Please update your payment information."
+  }
+}
+```
+
+<Note>Common `billingAttemptResponseMessage` values: `INVALID_PAYMENT_METHOD`, `INSUFFICIENT_FUNDS`, `AUTHENTICATION_REQUIRED`, `CARD_DECLINED`, `EXPIRED_PAYMENT_METHOD`, `INVENTORY_ALLOCATIONS_NOT_FOUND`, `PAYMENT_METHOD_VERIFICATION_FAILED`.</Note>
+
+  </Tab>
+  <Tab title="billing-skipped">
+
+```json
+{
+  "type": "subscription.billing-skipped",
+  "data": {
+    "id": 98767,
+    "shop": "example-store.myshopify.com",
+    "contractId": 12345,
+    "status": "SKIPPED",
+    "billingDate": "2026-04-15T00:00:00Z",
+    "retryingNeeded": false,
+    "inventorySkippedAttemptCount": 1,
+    "inventorySkippedRetryingNeeded": true,
+    "partialLinesSkipped": "OUT_OF_STOCK",
+    "billingAttemptResponseMessage": "INVENTORY_ALLOCATIONS_NOT_FOUND: One or more products are out of stock."
+  }
+}
+```
+
+  </Tab>
+  <Tab title="upcoming-order-notification">
+
+```json
+{
+  "type": "subscription.upcoming-order-notification",
+  "data": {
+    "id": 98768,
+    "shop": "example-store.myshopify.com",
+    "contractId": 12345,
+    "status": "PENDING",
+    "billingDate": "2026-05-15T00:00:00Z",
+    "attemptCount": 0,
+    "retryingNeeded": false,
+    "upcomingOrderEmailSentStatus": "SENT",
+    "upcomingOrderSmsSentStatus": "SENT"
+  }
+}
+```
+
+  </Tab>
+</Tabs>
+
+### Billing attempt fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | Long | Unique identifier for this billing attempt record |
+| `shop` | String | Shopify store domain |
+| `billingAttemptId` | String | Shopify GraphQL billing attempt ID |
+| `contractId` | Long | Related subscription contract ID (numeric, no `gid://` prefix) |
+| `status` | Enum | `SUCCESS`, `FAILURE`, `SKIPPED`, or `PENDING` |
+| `billingDate` | DateTime | ISO 8601 scheduled billing date |
+| `attemptTime` | DateTime | ISO 8601 actual attempt timestamp |
+| `attemptCount` | Integer | Number of billing attempts for this cycle |
+| `graphOrderId` | String | Shopify GraphQL order ID (if successful) |
+| `orderId` | Long | Shopify numeric order ID (if successful) |
+| `orderName` | String | Order name like `#1234` (if successful) |
+| `orderAmount` | Double | Order total in shop currency |
+| `retryingNeeded` | Boolean | Whether automatic retry is scheduled |
+| `billingAttemptResponseMessage` | String | Error message if failed/skipped, null if successful |
+| `inventorySkippedAttemptCount` | Integer | Count of skips due to inventory issues |
+| `partialLinesSkipped` | Enum | Reason for partial line skipping: `OUT_OF_STOCK`, `PRICE_CHANGE`, etc. |
+
+## Signature verification
+
+Every webhook request is signed by Svix. You must verify the signature before processing to ensure the request is authentic and has not been tampered with.
+
+Svix adds three headers to every request:
+
+| Header | Description |
+|--------|-------------|
+| `svix-id` | Unique message ID — use this for idempotency |
+| `svix-timestamp` | Unix timestamp when the message was sent |
+| `svix-signature` | Cryptographic signature |
+
+Find your webhook signing secret in **Settings → Webhooks** in the Appstle dashboard.
+
+<CodeGroup>
+
+```javascript Node.js
+const { Webhook } = require('svix');
+
+const secret = 'whsec_your_webhook_signing_secret';
+
+app.post('/webhooks/appstle', (req, res) => {
+  const payload = JSON.stringify(req.body);
+  const headers = {
+    'svix-id': req.headers['svix-id'],
+    'svix-timestamp': req.headers['svix-timestamp'],
+    'svix-signature': req.headers['svix-signature'],
+  };
+
+  const wh = new Webhook(secret);
+  let event;
+
+  try {
+    event = wh.verify(payload, headers);
+  } catch (err) {
+    return res.status(400).send('Webhook signature verification failed');
+  }
+
+  console.log('Event type:', event.type);
+  console.log('Event data:', event.data);
+
+  res.status(200).send('OK');
+});
+```
+
+```python Python
+from svix.webhooks import Webhook
+
+secret = "whsec_your_webhook_signing_secret"
+
+@app.route("/webhooks/appstle", methods=["POST"])
+def webhook():
+    payload = request.get_data()
+    headers = {
+        "svix-id": request.headers.get("svix-id"),
+        "svix-timestamp": request.headers.get("svix-timestamp"),
+        "svix-signature": request.headers.get("svix-signature"),
+    }
+
+    wh = Webhook(secret)
+    try:
+        event = wh.verify(payload, headers)
+    except Exception:
+        return "Webhook signature verification failed", 400
+
+    print("Event type:", event["type"])
+    return "OK", 200
+```
+
+</CodeGroup>
+
+Svix also provides verification libraries for Go, Ruby, PHP, Java, and C#. See the [Svix documentation](https://docs.svix.com/receiving/verifying-payloads/how) for all language examples.
+
+## Testing webhooks
+
+### Using Svix Play
+
+1. Go to **Settings → Webhooks** in your Appstle dashboard.
+2. Click on your endpoint.
+3. Use the **Send Example** feature to send a sample event.
+4. Verify your endpoint receives and processes the webhook correctly.
+
+### Local development
+
+Use [ngrok](https://ngrok.com/) or [localtunnel](https://localtunnel.me/) to expose your local server:
+
+```bash
+ngrok http 3000
+```
+
+Then add the generated public URL (e.g. `https://abc123.ngrok.io/webhooks/appstle`) as a webhook endpoint in your Appstle dashboard.
+
+## Retry schedule
+
+If your endpoint does not return a `2xx` status code, Svix retries automatically using exponential backoff over 5 attempts across 3 days. Endpoints that fail consistently are automatically disabled to prevent wasted resources.
+
+You can manually retry failed deliveries from the Svix dashboard, and view all delivery attempts in **Settings → Webhooks → Message Logs**.
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|---------|
+| Signature verification fails | Use the exact signing secret from your dashboard. Do not modify the raw request body before verification. |
+| Timeouts | Return `200 OK` immediately and process the event in a background job. |
+| Wrong status codes | Return `2xx` for all successful receipts, even if you have business logic errors. |
+| CSRF protection blocking webhooks | Exempt your webhook endpoint from CSRF checks in your web framework. |
+| Duplicate events | Webhooks may be delivered more than once. Use the `svix-id` header to make your processing idempotent. |
+
+<Tip>
+  Log the raw webhook payload during development so you can inspect the exact data structure. Test with a simple endpoint that just logs and returns `200 OK` before adding business logic.
+</Tip>
+
+Need help? Email [support@appstle.com](mailto:support@appstle.com) with your endpoint URL and the `svix-id` of any failing message.

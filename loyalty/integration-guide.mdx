@@ -1,0 +1,277 @@
+---
+title: "Appstle Loyalty third-party integration guide"
+description: "Build a production integration with Appstle Loyalty. Covers authentication, base URL, point management, enrollment, rewards, store credits, and partner keys."
+---
+
+This guide covers everything you need to build a production-ready integration with Appstle Loyalty. It walks through authentication, every major endpoint category, and common integration patterns for the most popular tool types (CRMs, email platforms, review apps).
+
+## Base URL
+
+All Admin API endpoints share the same base:
+
+```
+https://loyalty-admin.appstle.com
+```
+
+Every endpoint is prefixed with `/api/external/`.
+
+## Authentication
+
+<Tabs>
+  <Tab title="Merchant API key">
+    Direct integrations pass the merchant's API key in the `X-API-Key` header. Merchants create keys under **Settings → API Key Management** in the Appstle admin. Each key is scoped to a single store, and up to 10 active keys are allowed per store.
+
+    ```bash
+    curl -H "X-API-Key: apst_your-api-key-here" \
+      "https://loyalty-admin.appstle.com/api/external/customer-loyalty?shop=your-store.myshopify.com&customer_id=12345"
+    ```
+
+    <Note>
+      Direct API access requires an active API plan. Contact [support@appstle.com](mailto:support@appstle.com) for details.
+    </Note>
+  </Tab>
+  <Tab title="Partner integration (recommended)">
+    If you are building a product that connects to multiple merchants (a helpdesk, CRM, review platform, or email tool), use the Partner Integration Framework. Your app receives a scoped `apst_` API token for each merchant through a one-click handshake — no manual key exchange needed.
+
+    Partner tokens:
+    - Bypass the paid API plan (merchants are never billed for partner API usage)
+    - Are provisioned automatically during the handshake
+    - Are revoked instantly when a merchant disconnects or uninstalls Appstle
+
+    Once you have a token, use it exactly like a merchant API key in the `X-API-Key` header.
+
+    To apply, email [support@appstle.com](mailto:support@appstle.com) with your company name, product, and expected call volume.
+  </Tab>
+  <Tab title="Legacy X-App-Key">
+    Existing integrations that already use the `X-App-Key` header continue to work. Pass both headers:
+
+    ```
+    X-API-Key: <merchant-api-key>
+    X-App-Key: <your-partner-key>
+    ```
+
+    New integrations should use the Partner Integration Framework instead. It removes the need for merchants to share API keys and provides a better onboarding experience.
+  </Tab>
+</Tabs>
+
+## Point management
+
+### Look up a customer's loyalty data
+
+Retrieve a complete loyalty profile by Shopify customer ID or email.
+
+```bash
+# By customer ID
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/customer-loyalty?shop=your-store.myshopify.com&customer_id=12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+The response includes available, pending, and credited points; current VIP tier; store credit balance; referral link; active rewards; and social engagement status.
+
+### Add points
+
+Credit points to a customer's account. Include a `note` so the transaction is labeled clearly in the customer's history.
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/add-points" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "points": 100,
+    "note": "VIP welcome bonus"
+  }'
+```
+
+### Redeem points for a reward
+
+Convert a customer's points into a discount code using a configured redemption rule.
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/redeem-points" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "pointRedeemRuleId": 42
+  }'
+```
+
+To get the list of valid `pointRedeemRuleId` values, call `GET /api/external/point-redeem-rules` (see [Program configuration](#program-configuration) below).
+
+### Get transaction history
+
+Retrieve a customer's full point transaction log.
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/point-transaction-history/12345?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Approve pending transactions
+
+For programs where points require approval before becoming available, use this endpoint to move pending points to available.
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/approve-pending-transactions?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"customerId": 12345}'
+```
+
+## Customer management
+
+### Enroll a customer
+
+Add a customer to the loyalty program. Call this before attempting to add points to a customer who has not yet joined.
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/enroll-customer" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "customerEmail": "customer@example.com"
+  }'
+```
+
+### Update a customer's birthday
+
+Set a date of birth to enable birthday reward automation. Date format is `YYYY-MM-DD`.
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/update-customer-birth-date?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerId": 12345,
+    "birthDate": "1990-06-15"
+  }'
+```
+
+### Get top customers
+
+Retrieve your highest-value loyalty members ranked by points.
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/top-customers?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Rewards and discounts
+
+### Check a discount code
+
+Validate a loyalty discount code before applying it at checkout. Returns whether the code is valid, unused, and which customer it belongs to.
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/check-discount?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"discountCode": "REWARD-XXXX"}'
+```
+
+### Mark a discount as used
+
+After a customer applies a reward code at checkout, mark it as used to prevent reuse.
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/update-discount-code-status?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "discountCode": "REWARD-XXXX",
+    "status": "USED"
+  }'
+```
+
+## Store credits
+
+### Add store credits
+
+Credit a monetary amount to a customer's store credit balance. Credits are applied at checkout and are separate from loyalty points.
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/add-credits" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "credits": 10.00,
+    "note": "Goodwill credit for support issue"
+  }'
+```
+
+## Program configuration
+
+### Get point earn rules
+
+Retrieve all active point earn rules for your store. Use the returned `id` values when calling `add-points` with a specific rule.
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/point-earn-rules?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Get point redeem rules
+
+Retrieve all active redemption options. Use the returned `id` values as `pointRedeemRuleId` when redeeming points.
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/point-redeem-rules?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Rate limits
+
+If you receive a `429 Too Many Requests` response, implement exponential backoff before retrying. Do not retry immediately.
+
+## Common integration patterns
+
+<AccordionGroup>
+  <Accordion title="Review platform (Judge.me, Okendo, Yotpo)">
+    1. Customer submits a review on your platform.
+    2. Your platform calls `POST /api/external/add-points` to credit points.
+    3. Optionally, use the Shopify Flow `reward-points-for-reviews` action for a no-code setup that does not require API calls.
+  </Accordion>
+  <Accordion title="CRM or helpdesk (Gorgias, Zendesk)">
+    1. Call `GET /api/external/customer-loyalty` by customer email or ID to display loyalty status alongside the ticket.
+    2. Call `POST /api/external/add-points` or `POST /api/external/add-credits` to issue goodwill adjustments.
+    3. Call `GET /api/external/point-transaction-history/{customer_id}` to show recent activity in context.
+  </Accordion>
+  <Accordion title="Email or SMS platform (Klaviyo, Omnisend)">
+    1. Use webhooks to receive real-time point and tier events for trigger-based campaigns.
+    2. Call `GET /api/external/customer-loyalty` to enrich customer profiles with points balance, VIP tier, and referral link.
+    3. Segment customers by `currentVipTier` or `availablePoints` range for targeted sends.
+  </Accordion>
+</AccordionGroup>
+
+## Webhooks and Shopify Flow
+
+For real-time event notifications, see the [Webhooks guide](/loyalty/webhooks). For no-code automation without managing webhook infrastructure, see the [Shopify Flow guide](/loyalty/shopify-flow).
+
+## Becoming a partner
+
+If your product integrates with loyalty programs, Appstle offers a formal partner program:
+
+- Zero-friction merchant onboarding via the Partner Integration Framework
+- Scoped API tokens per merchant — no manual key exchange
+- Merchants are never charged for partner API usage
+- Technical support, co-marketing opportunities, and directory listing
+
+Current partners include Judge.me, Klaviyo, Omnisend, and Gorgias.
+
+To apply, email [support@appstle.com](mailto:support@appstle.com) with your company name, product description, required data access, and expected call volume per merchant.

@@ -1,0 +1,360 @@
+---
+title: "Membership Metafields and Customer Tags Reference"
+description: "Shopify metafields and tags set by Appstle Memberships — what they contain, when they update, and how to use them for storefront gating and integrations."
+---
+
+Appstle Memberships uses Shopify metafields and customer tags to store membership data, power storefront access gating, and drive checkout validation. This reference covers every metafield and tag — what it contains, when it is set, and how to use it in your integration or Liquid theme.
+
+All metafields use the namespace `appstle_membership` without a `$app:` prefix, which means they are publicly readable by other apps, themes, and Liquid templates.
+
+## Metafields overview
+
+Metafields are set on three Shopify resource types:
+
+| Resource | Keys | Visibility | Description |
+|----------|------|------------|-------------|
+| **Shop** | 6 | Public | Membership settings, selling plans, access rules, checkout validation, widget labels |
+| **Customer** | 2 | Public | Membership contracts, trial and dunning state |
+| **Order** | 1 | Public | Membership contract context for each order |
+
+## Shop metafields
+
+Shop metafields store the membership program configuration and are used by the storefront for access gating, checkout validation, and widget rendering. They are updated synchronously on every settings save in the Appstle admin.
+
+### `appstle_membership` / `setting`
+
+Stores shop-level membership settings as a snapshot for storefront access. Used by the app and themes to determine global membership behavior.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Shop |
+
+### `appstle_membership` / `all_selling_plans`
+
+All selling plans configured for this store's membership program. Themes and apps read this to display available membership options.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Shop |
+
+```json
+[
+  {
+    "id": "gid://shopify/SellingPlan/111",
+    "name": "Basic Monthly Membership",
+    "billingPolicy": {
+      "interval": "MONTH",
+      "intervalCount": 1
+    },
+    "customerTag": "basic-member",
+    "orderTag": "membership-order"
+  },
+  {
+    "id": "gid://shopify/SellingPlan/222",
+    "name": "Premium Annual Membership",
+    "billingPolicy": {
+      "interval": "YEAR",
+      "intervalCount": 1
+    },
+    "customerTag": "premium-member",
+    "orderTag": "premium-membership-order"
+  }
+]
+```
+
+### `appstle_membership` / `rules_by_customer_tag`
+
+Access rules keyed by customer tag. The storefront reads this metafield alongside the customer's tags to determine which collections and products each membership tier can access.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Shop |
+
+```json
+{
+  "basic-member": {
+    "accessibleCollections": ["gid://shopify/Collection/111"],
+    "accessibleProducts": [],
+    "gatingType": "COLLECTION"
+  },
+  "premium-member": {
+    "accessibleCollections": ["gid://shopify/Collection/111", "gid://shopify/Collection/222"],
+    "accessibleProducts": ["gid://shopify/Product/333"],
+    "gatingType": "COLLECTION_AND_PRODUCT"
+  }
+}
+```
+
+<Info>
+  If a customer has the `premium-member` tag, they see all collections and products mapped to that tag. Non-members or lower tiers see gated content as locked or hidden, depending on your theme configuration.
+</Info>
+
+### `appstle_membership` / `checkout_validation`
+
+Checkout validation configuration. Enforces member-only product purchase rules at checkout.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Shop |
+
+### `appstle_membership` / `widget_label`
+
+Storefront widget label translations for the default locale.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Shop |
+
+### `appstle_membership` / `customer_portal_label`
+
+Customer portal label translations for the default locale. For non-default locales, translations are registered via Shopify's `TranslationsRegisterMutation` rather than separate metafields.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Shop |
+
+## Customer metafields
+
+Customer metafields are updated asynchronously whenever a membership contract changes. Updates are queued and processed within a few seconds, though processing may take longer during high-traffic periods.
+
+### `appstle_membership` / `subscriptions`
+
+All membership contracts for this customer with full details. Updated whenever any contract for the customer changes — created, updated, paused, cancelled, or billed.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Customer |
+
+```json
+[
+  {
+    "id": "gid://shopify/SubscriptionContract/9876543210",
+    "status": "ACTIVE",
+    "sellingPlanIds": ["gid://shopify/SellingPlan/111"],
+    "sellingPlanNames": ["Premium Monthly Membership"],
+    "variantIds": ["gid://shopify/ProductVariant/222"],
+    "variantNames": ["Premium Membership"],
+    "nextBillingDate": "2025-04-15T10:30:00Z"
+  }
+]
+```
+
+### `appstle_membership` / `setting`
+
+Customer-level settings tracking trial and dunning state for this customer's active plans.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Customer |
+
+```json
+{
+  "trialTags": "basic-member,premium-member",
+  "dunningTags": "premium-member"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `trialTags` | Comma-separated plan customer tags where the customer is currently in a free trial (no successful billing yet, within the trial window) |
+| `dunningTags` | Comma-separated plan customer tags where the customer has a recent failed billing attempt requiring retry |
+
+<Note>
+  The key `setting` is used for both Shop-level and Customer-level metafields, but they contain different data structures. The resource type (Shop vs. Customer) distinguishes them.
+</Note>
+
+## Order metafields
+
+### `appstle_membership` / `details`
+
+Full membership contract context at the time the order was created. Set on both initial purchase orders and recurring renewal orders.
+
+| Property | Value |
+|----------|-------|
+| Type | `json` |
+| Resource | Order |
+
+```json
+{
+  "customer": {
+    "id": "gid://shopify/Customer/1234567890",
+    "name": "Jane Smith",
+    "email": "jane@example.com"
+  },
+  "subscriptionContract": {
+    "id": "gid://shopify/SubscriptionContract/9876543210",
+    "status": "ACTIVE",
+    "sellingPlanIds": ["gid://shopify/SellingPlan/111"],
+    "sellingPlanNames": ["Premium Monthly Membership"],
+    "variantIds": ["gid://shopify/ProductVariant/222"],
+    "variantNames": ["Premium Membership"]
+  },
+  "firstOrder": {
+    "id": "gid://shopify/Order/444",
+    "createdAt": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+## Customer tags
+
+Customer tags are the primary mechanism for membership access control. Each membership plan has a merchant-configured `customerTag` that is added to a customer's Shopify profile when their contract is active.
+
+### Plan-based customer tags
+
+| Property | Value |
+|----------|-------|
+| Format | Free-form string per plan (e.g., `basic-member`, `premium-member`, `vip-member`) |
+| Configured in | Appstle admin — each membership plan's settings |
+
+#### Tag lifecycle
+
+| Event | Tag action |
+|-------|-----------|
+| Contract becomes **ACTIVE** | Plan's `customerTag` is **added** |
+| Contract **CANCELLED** | Tag **removed** (immediately if `immediateTagRemoveOnCancel=true`, otherwise at `nextBillingDate`) |
+| Contract **PAUSED** | Tag **removed** (immediately if `immediateTagRemoveOnPause=true`, otherwise at `nextBillingDate`) |
+| Contract enters **DUNNING** (failed payment) | Tag **removed** |
+| Contract **RESUMED** | Tag **re-added** |
+
+#### Delayed vs. immediate tag removal
+
+| Setting | Default | Behavior |
+|---------|---------|---------|
+| `immediateTagRemoveOnCancel` | `false` | If `false`, the tag stays until `nextBillingDate` so the member retains access for the period they paid for. Set to `true` to remove access immediately. |
+| `immediateTagRemoveOnPause` | `false` | Same behavior for paused memberships. |
+
+#### Cross-membership protection
+
+When removing a tag on cancellation or pause, the app checks all other active contracts for the same customer. If another active contract uses the same `customerTag`, the tag is **not removed** — the customer retains access.
+
+For example: a customer holds "Basic Monthly" and "Basic Annual", both using the `basic-member` tag. Cancelling "Basic Monthly" does not remove the `basic-member` tag because "Basic Annual" is still active.
+
+### Trial-state tags
+
+During a free trial, the plan's `customerTag` is applied — there is no separate trial tag. Trial members get identical access to paying members.
+
+### Dunning-state tags
+
+When a billing attempt fails, the plan's `customerTag` may be removed and the tag is tracked in `dunningTags`. If a retry succeeds, the tag is re-added and access is restored automatically.
+
+### Plan upgrade/downgrade tag swap
+
+When a member changes plans, tags are swapped atomically:
+
+1. Old plan's `customerTag` is removed
+2. New plan's `customerTag` is added
+3. If the upgrade payment fails, the swap is rolled back: new tag removed, old tag restored
+
+## Order tags
+
+### Plan-based order tags
+
+Applied to orders on initial membership purchase and on each renewal billing.
+
+| Property | Value |
+|----------|-------|
+| Format | Free-form string per plan |
+| Configured in | Appstle admin — each membership plan's settings |
+| Removed | Never (order tags are permanent) |
+
+### First-time order tag
+
+| Property | Value |
+|----------|-------|
+| Config field | `ShopInfo.firstTimeOrderTag` |
+| Format | Liquid template string |
+| Applied when | Initial membership contract creation only |
+
+### Recurring order tag
+
+| Property | Value |
+|----------|-------|
+| Config field | `ShopInfo.recurringOrderTag` |
+| Format | Liquid template string |
+| Applied when | Each recurring billing attempt |
+
+### Liquid template variables for order tags
+
+Both `firstTimeOrderTag` and `recurringOrderTag` support Liquid template syntax:
+
+| Variable | Type | Example |
+|----------|------|---------|
+| `{{customer.id}}` | String | `gid://shopify/Customer/1234567890` |
+| `{{subscriptionContract.id}}` | String | `gid://shopify/SubscriptionContract/9876` |
+| `{{firstOrder.id}}` | String | `gid://shopify/Order/444` |
+| `{{firstOrder.createdAt}}` | String | `2025-01-15T10:30:00Z` |
+
+Example — dynamic tag with contract info:
+
+```
+membership_{{subscriptionContract.id}}
+```
+
+Result: `membership_gid://shopify/SubscriptionContract/9876`
+
+## Reading metafields in Liquid
+
+All membership metafields are readable in Liquid templates because they use the `appstle_membership` namespace without an `$app:` prefix:
+
+```liquid
+{{ shop.metafields.appstle_membership.setting }}
+{{ customer.metafields.appstle_membership.subscriptions }}
+{{ customer.metafields.appstle_membership.setting }}
+```
+
+## Complete metafield reference
+
+| Resource | Namespace | Key | Type |
+|----------|-----------|-----|------|
+| Shop | `appstle_membership` | `setting` | json |
+| Shop | `appstle_membership` | `all_selling_plans` | json |
+| Shop | `appstle_membership` | `rules_by_customer_tag` | json |
+| Shop | `appstle_membership` | `checkout_validation` | json |
+| Shop | `appstle_membership` | `widget_label` | json |
+| Shop | `appstle_membership` | `customer_portal_label` | json |
+| Customer | `appstle_membership` | `subscriptions` | json |
+| Customer | `appstle_membership` | `setting` | json |
+| Order | `appstle_membership` | `details` | json |
+
+## Complete tag reference
+
+| Resource | Tag source | Applied when | Removed when | Permanent? |
+|----------|-----------|--------------|--------------|------------|
+| Customer | Plan `customerTag` | Contract ACTIVE or TRIAL | Contract CANCELLED, PAUSED, DUNNING, or EXPIRED | No |
+| Customer | Plan `customerTag` (upgrade) | Plan upgrade | Failed upgrade rollback | No |
+| Order | Plan `orderTag` | Order created (first or renewal) | Never | Yes |
+| Order | `firstTimeOrderTag` (Liquid) | First order only | Never | Yes |
+| Order | `recurringOrderTag` (Liquid) | Each renewal | Never | Yes |
+| Order | New plan's `orderTag` | Variant swap | Never | Yes |
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Can I read membership metafields from my Liquid theme?">
+    Yes. All membership metafields use the `appstle_membership` namespace without a `$app:` prefix, so they are accessible in Liquid via `{{ shop.metafields.appstle_membership.setting }}`, `{{ customer.metafields.appstle_membership.subscriptions }}`, and so on.
+  </Accordion>
+  <Accordion title="What happens when a member cancels mid-billing-cycle?">
+    By default (`immediateTagRemoveOnCancel=false`), the customer keeps their membership tag until `nextBillingDate`. They retain access for the period they have already paid for. Set `immediateTagRemoveOnCancel=true` to remove access immediately on cancellation.
+  </Accordion>
+  <Accordion title="What if a customer has the same tag from two different memberships?">
+    The app has cross-membership protection. When removing a tag due to cancellation or pause, it checks whether any other active contract for this customer uses the same tag. If so, the tag is not removed and the customer retains access.
+  </Accordion>
+  <Accordion title="How quickly are customer metafields updated?">
+    Customer metafield updates are queued and processed asynchronously. Typical latency is a few seconds, but during high-traffic periods it may take longer.
+  </Accordion>
+  <Accordion title="Do trial members get the same tag as paying members?">
+    Yes. During a free trial, the plan's `customerTag` is applied — there is no separate trial tag. Trial members get the same access as paying members.
+  </Accordion>
+  <Accordion title="What happens during dunning (failed payment)?">
+    When a billing attempt fails, the plan's `customerTag` may be removed and the member loses access. The `dunningTags` field tracks which tags are in dunning. If a retry succeeds, the tag is re-added and access is restored automatically.
+  </Accordion>
+</AccordionGroup>

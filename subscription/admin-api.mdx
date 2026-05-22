@@ -1,0 +1,328 @@
+---
+title: "Appstle Subscriptions Admin API reference"
+sidebarTitle: "Admin API"
+description: "Appstle Subscriptions Admin API reference: manage subscriptions, billing, products, bundles, and bulk operations with full request and response examples."
+---
+
+The Admin API gives you server-side access to every aspect of your subscription business. All endpoints require an `X-API-Key` header and are prefixed with the base URL below. Never call this API from client-side code.
+
+**Base URL:** `https://subscription-admin.appstle.com/api/external/v2/`
+
+**Authentication:** `X-API-Key: apst_your-api-key-here`
+
+For key creation and management, see the [Authentication](/subscription/authentication) page.
+
+## Subscription management
+
+### Get customer subscriptions
+
+Retrieve all subscription contracts for a customer, including active, paused, and cancelled.
+
+```bash
+GET /subscription-customers/{customerId}
+```
+
+```bash
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/55555" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+The response includes products, next billing date, shipping address, delivery method, and payment details for each contract.
+
+### Check for active subscriptions
+
+Returns an array of contract IDs. An empty array means no active subscriptions.
+
+```bash
+GET /subscription-customers/valid/{customerId}
+```
+
+```bash
+curl "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/55555" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+**Response:**
+```json
+[5234567890, 5234567891]
+```
+
+### Get contract details
+
+Retrieve full details for a specific subscription contract.
+
+```bash
+GET /subscription-contract-details?contractId={contractId}
+```
+
+```bash
+curl "https://subscription-admin.appstle.com/api/external/v2/subscription-contract-details?contractId=12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Cancel a subscription
+
+```bash
+DELETE /subscription-contracts/{contractId}
+```
+
+```bash
+curl -X DELETE \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts/12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Update subscription status
+
+Set status to `ACTIVE`, `PAUSED`, or `CANCELLED`.
+
+```bash
+PUT /subscription-contracts-update-status
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-status" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "status": "PAUSED"}'
+```
+
+### Update billing date
+
+Reschedule the next billing date.
+
+```bash
+PUT /subscription-contracts-update-billing-date
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-billing-date" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "nextBillingDate": "2026-03-15T00:00:00Z"}'
+```
+
+### Update billing interval
+
+Change the billing frequency.
+
+```bash
+PUT /subscription-contracts-update-billing-interval
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-billing-interval" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "billingIntervalCount": 2, "billingInterval": "MONTH"}'
+```
+
+Valid `billingInterval` values: `DAY`, `WEEK`, `MONTH`, `YEAR`.
+
+## Billing & payments
+
+### Get upcoming orders
+
+See what is scheduled next for a subscription.
+
+```bash
+GET /subscription-billing-attempts/top-orders?contractId={contractId}
+```
+
+### Skip an upcoming order
+
+```bash
+PUT /subscription-billing-attempts/skip-order/{billingAttemptId}
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-billing-attempts/skip-order/99999" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Get past orders (order history)
+
+```bash
+GET /subscription-billing-attempts/past-orders?contractId={contractId}
+```
+
+```bash
+curl "https://subscription-admin.appstle.com/api/external/v2/subscription-billing-attempts/past-orders?contractId=12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+Supports additional query parameters for advanced filtering. See the full OpenAPI reference for available filter fields.
+
+## Product management
+
+### Add a product to a subscription
+
+```bash
+PUT /subscription-contracts-add-line-item
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-add-line-item" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "variantId": "22222", "quantity": 1}'
+```
+
+### Remove a product from a subscription
+
+```bash
+PUT /subscription-contracts-remove-line-item
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-remove-line-item" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "lineId": "67890"}'
+```
+
+### Update product quantity
+
+```bash
+PUT /subscription-contracts-update-line-item-quantity
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-line-item-quantity" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "lineId": "67890", "quantity": 3}'
+```
+
+## Discounts
+
+### Apply a discount code
+
+```bash
+PUT /subscription-contracts-apply-discount
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-apply-discount" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345", "discountCode": "SAVE10"}'
+```
+
+### Remove a discount
+
+```bash
+PUT /subscription-contracts-remove-discount
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-remove-discount" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "12345"}'
+```
+
+## Shipping
+
+### Update shipping address
+
+```bash
+PUT /subscription-contracts-update-shipping-address
+```
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-shipping-address" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contractId": "12345",
+    "address1": "123 Main St",
+    "city": "San Francisco",
+    "province": "California",
+    "country": "United States",
+    "zip": "94105"
+  }'
+```
+
+## Endpoint groups
+
+The following endpoint groups are available in the full Admin API. Use the OpenAPI reference for complete request/response schemas.
+
+<AccordionGroup>
+  <Accordion title="Subscription contracts">
+    Create, read, update, and delete subscription contracts. Manage status (active, paused, cancelled), billing dates, billing intervals, and contract-level settings.
+  </Accordion>
+  <Accordion title="Subscription plans">
+    Configure subscription plans (selling plans), pricing, billing frequencies, and discount structures. Create and manage plan groups.
+  </Accordion>
+  <Accordion title="Subscription data">
+    Retrieve subscription products, customer information, and selling plan allocations. Useful for reporting and data sync.
+  </Accordion>
+  <Accordion title="Billing attempts">
+    Process payments, manage billing cycles, skip orders, reschedule orders, and retrieve billing history. Includes one-time add-on management.
+  </Accordion>
+  <Accordion title="Products & variants">
+    Manage subscription-eligible products and variants. Configure product swaps and automatic product rotation rules.
+  </Accordion>
+  <Accordion title="Build-a-Box & bundles">
+    Create and manage subscription bundles and the Build-a-Box product builder. Configure bundle contents, validation rules, and pricing.
+  </Accordion>
+  <Accordion title="Bulk operations">
+    Run bulk status updates, bulk billing date changes, and other batch operations across multiple subscription contracts.
+  </Accordion>
+  <Accordion title="Delivery & fulfillment">
+    Manage shipping profiles, delivery methods, and fulfillment settings for subscription orders.
+  </Accordion>
+  <Accordion title="Retention & cancellation">
+    Configure cancellation flows, retention offers, and cancellation reason tracking. Manage winback campaigns.
+  </Accordion>
+  <Accordion title="Settings & configuration">
+    Read and update shop-level settings, view activity logs, and manage app configuration.
+  </Accordion>
+  <Accordion title="Reporting & analytics">
+    **Contract analytics** — revenue metrics and order counts per subscription contract.
+
+    **Past orders report** — detailed billing history with advanced filtering by date range, status, product, and more.
+  </Accordion>
+  <Accordion title="Theming & customization">
+    **Theme settings** — trigger script regeneration and manage theme integration.
+
+    **Custom CSS** — manage custom styling for the subscription widget and customer portal.
+  </Accordion>
+</AccordionGroup>
+
+## Rate limits
+
+Requests are rate-limited per store. Implement exponential backoff when you receive a `429 Too Many Requests` response. Do not immediately retry at full speed.
+
+## Error responses
+
+All errors follow this structure:
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid API key provided",
+  "status": 401
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Bad request — check your request parameters |
+| `401` | Missing or invalid API key |
+| `403` | Key lacks required permissions |
+| `404` | Resource not found |
+| `429` | Rate limit exceeded — back off and retry |
+| `500` | Server error — contact support if persistent |

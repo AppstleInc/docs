@@ -1,0 +1,142 @@
+---
+title: "Get started with Appstle Subscriptions API"
+sidebarTitle: "Quickstart"
+description: "Create your Appstle API key, make your first authenticated request, and retrieve a customer's subscriptions in under five minutes with working curl examples."
+---
+
+This guide walks you through the three steps needed to make your first successful API call: creating an API key, sending an authenticated request, and reading the response. By the end you will have verified that your credentials work and seen what subscription data looks like.
+
+<Info>
+  You need an active Appstle Subscriptions installation on a Shopify store to follow this guide. If you do not have one yet, install the app from the Shopify App Store first.
+</Info>
+
+## Step 1 — Get your API key
+
+<Steps>
+  <Step title="Navigate to API Key Management">
+    Log in to your Appstle admin panel and go to **Settings → API Key Management**.
+  </Step>
+  <Step title="Create a key">
+    Click **Create New Key**. Give it a name like `Quickstart Test` so you can identify it later.
+  </Step>
+  <Step title="Copy the key">
+    The key is shown only once. Copy it now — you cannot retrieve it again. It will look like `apst_abc123...`.
+  </Step>
+</Steps>
+
+<Warning>
+  Keep this key secret. Do not commit it to source control or include it in client-side code. For production use, store it in an environment variable or a secrets manager.
+</Warning>
+
+## Step 2 — Make your first request
+
+The simplest useful call checks whether a specific customer has any active subscriptions. Replace `YOUR_API_KEY` with your key and `CUSTOMER_ID` with a numeric Shopify customer ID from your store.
+
+<CodeGroup>
+
+```bash curl
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/CUSTOMER_ID" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+```javascript Node.js
+const customerId = 'CUSTOMER_ID';
+
+const response = await fetch(
+  `https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/${customerId}`,
+  {
+    headers: {
+      'X-API-Key': process.env.APPSTLE_API_KEY,
+    },
+  }
+);
+
+const contractIds = await response.json();
+console.log(contractIds); // [5234567890, 5234567891]
+```
+
+```python Python
+import os
+import requests
+
+customer_id = 'CUSTOMER_ID'
+
+response = requests.get(
+    f'https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/{customer_id}',
+    headers={'X-API-Key': os.environ['APPSTLE_API_KEY']},
+)
+
+contract_ids = response.json()
+print(contract_ids)  # [5234567890, 5234567891]
+```
+
+</CodeGroup>
+
+## Step 3 — Check the response
+
+A successful response returns an HTTP `200` with a JSON array of Shopify subscription contract IDs for that customer:
+
+```json
+[5234567890, 5234567891]
+```
+
+An empty array means the customer has no active subscriptions. If you receive a `401`, double-check that you copied the API key correctly and that it has not been revoked.
+
+| Response | Meaning |
+|----------|---------|
+| `200` with array | Customer has subscriptions — the array contains their contract IDs |
+| `200` with `[]` | Customer exists but has no active subscriptions |
+| `401` | API key is missing or invalid |
+| `404` | No customer found with that ID |
+
+## Step 4 — Retrieve full subscription details
+
+Now that you have a contract ID, you can fetch the complete details for that subscription:
+
+<CodeGroup>
+
+```bash curl
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contract-details?contractId=5234567890" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+```javascript Node.js
+const contractId = 5234567890;
+
+const response = await fetch(
+  `https://subscription-admin.appstle.com/api/external/v2/subscription-contract-details?contractId=${contractId}`,
+  {
+    headers: {
+      'X-API-Key': process.env.APPSTLE_API_KEY,
+    },
+  }
+);
+
+const subscription = await response.json();
+console.log(subscription.status);          // "ACTIVE"
+console.log(subscription.nextBillingDate); // "2026-02-15"
+console.log(subscription.customer.email);  // "customer@example.com"
+```
+
+</CodeGroup>
+
+The response includes the subscription status, next billing date, products, customer details, shipping address, payment method, and applied discounts.
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Integration guide" icon="book" href="/subscription/integration-guide">
+    Full walkthrough of subscription management, product operations, discounts, shipping, and more.
+  </Card>
+  <Card title="Admin API reference" icon="code" href="/subscription/admin-api">
+    Complete endpoint reference with all available operations.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/subscription/webhooks">
+    Receive real-time notifications when subscriptions change.
+  </Card>
+  <Card title="Shopify Flow" icon="bolt" href="/subscription/shopify-flow">
+    Automate subscription workflows without writing backend code.
+  </Card>
+</CardGroup>

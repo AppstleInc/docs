@@ -1,0 +1,135 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Appstle",
+  "favicon": "https://media.brand.dev/3243cc62-6330-4448-8e24-d4c9508a4d0e.webp",
+  "colors": {
+    "primary": "#0caceb",
+    "light": "#6ccdf2",
+    "dark": "#0caceb"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/AppstleInc"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Subscriptions",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "subscription/introduction",
+              "subscription/authentication",
+              "subscription/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "subscription/integration-guide",
+              "subscription/shopify-flow",
+              "subscription/javascript-hooks",
+              "subscription/metafields-and-tags"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "subscription/webhooks"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "subscription/admin-api",
+              "subscription/storefront-api"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "subscription/faq"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Loyalty",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "loyalty/introduction",
+              "loyalty/authentication",
+              "loyalty/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "loyalty/integration-guide",
+              "loyalty/shopify-flow",
+              "loyalty/metafields-and-tags"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "loyalty/webhooks"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "loyalty/admin-api",
+              "loyalty/storefront-api"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Memberships",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "memberships/introduction",
+              "memberships/authentication",
+              "memberships/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "memberships/integration-guide",
+              "memberships/shopify-flow",
+              "memberships/metafields-and-tags"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "memberships/webhooks"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "memberships/admin-api",
+              "memberships/customer-portal-api"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "website": "https://appstle.com"
+    }
+  }
+}

@@ -1,0 +1,132 @@
+---
+title: "Appstle Memberships: Tiered Plans & Access Control"
+description: "Appstle Memberships lets you build recurring membership programs on Shopify with tiered plans and gated content — via Admin and Customer Portal APIs."
+---
+
+Appstle Memberships gives you programmatic access to every part of your membership program — from creating tiered plans and gating content to processing renewals and tracking analytics. Whether you're connecting a CRM, building a mobile app, or customizing your storefront member portal, the APIs deliver the flexibility you need.
+
+## Available APIs
+
+<CardGroup cols={2}>
+  <Card title="Admin API" icon="server">
+    Server-side API for managing memberships, access rules, member data, and billing. Authenticate with an API key and call from your backend, mobile app, or automation tool.
+
+    **Authentication:** `X-API-Key` header
+
+    **Use cases:** Backend integrations, admin dashboards, bulk operations, mobile apps, third-party system sync
+  </Card>
+  <Card title="Customer Portal API" icon="user">
+    Customer-facing API for membership self-service, delivered via Shopify App Proxy. Members can view their plan, manage their membership, and access gated content directly from your storefront.
+
+    **Authentication:** Customer session (must be logged in)
+
+    **Use cases:** Custom member portals, theme integrations, self-service membership management, gated content
+  </Card>
+</CardGroup>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Membership Plans" icon="medal">
+    Create and manage tiered membership plans with flexible pricing and billing cycles — monthly, annual, or custom intervals.
+  </Card>
+  <Card title="Member Management" icon="users">
+    Retrieve and sync member data, plan status, and access entitlements across your systems in real time.
+  </Card>
+  <Card title="Access Control" icon="lock">
+    Gate content, collections, and pricing based on membership status and tier using customer tags and metafields.
+  </Card>
+  <Card title="Billing & Contracts" icon="credit-card">
+    Manage membership contracts, renewals, and billing attempts. Handle dunning, pauses, and cancellations programmatically.
+  </Card>
+  <Card title="Member Benefits" icon="gift">
+    Configure perks, discounts, and exclusive access rules per membership tier. Swap plans and roll back automatically on failed payments.
+  </Card>
+  <Card title="Notifications" icon="bell">
+    Automate member communications for renewals, expirations, billing failures, and upgrades via Shopify Flow or webhooks.
+  </Card>
+  <Card title="Analytics" icon="chart-bar">
+    Access membership metrics, churn data, MRR projections, and revenue analytics using contract list endpoints and billing events.
+  </Card>
+  <Card title="Shopify Native" icon="shopify">
+    Deep integration with Shopify Flow, metafields, customer tags, and the App Proxy — no separate infrastructure required.
+  </Card>
+</CardGroup>
+
+## Which API should you use?
+
+<Tabs>
+  <Tab title="Admin API">
+    Use the Admin API when you are building anything **outside your Shopify storefront**:
+
+    - Server-side integrations and automation workflows
+    - Managing memberships from your backend or a CRM
+    - Building admin dashboards or reporting tools
+    - Automating bulk operations across your member base
+    - Integrating with email platforms, analytics tools, or helpdesks
+    - Building mobile applications (iOS or Android)
+
+    The Admin API uses **API key authentication** (`X-API-Key` header) and must only be called from server-side code. Never expose your API key in browser JavaScript or public repositories.
+  </Tab>
+  <Tab title="Customer Portal API">
+    Use the Customer Portal API when you are building **member-facing features on your Shopify storefront**:
+
+    - Custom member portals embedded in your theme
+    - Self-service membership management (pause, cancel, upgrade)
+    - Gated content that requires an active membership to view
+    - Storefront pages that display plan details and billing dates
+
+    The Customer Portal API uses **Shopify App Proxy** for authentication — the customer must be logged in to your store. There is no API key involved. These endpoints are not suitable for server-side or mobile use.
+  </Tab>
+</Tabs>
+
+<Warning>
+  Customer Portal API endpoints are designed for storefront use via Shopify's App Proxy only. For any integration outside your storefront — such as mobile apps, backend services, or external tools — you must use the Admin API with a valid API key.
+</Warning>
+
+## Base URL
+
+All Admin API requests use the following base URL:
+
+```
+https://membership-admin.appstle.com/api/external/v2/
+```
+
+## Response format
+
+All API responses follow standard HTTP status codes.
+
+| Status | Meaning |
+|--------|---------|
+| `200` | Success — request completed |
+| `201` | Created — resource created successfully |
+| `400` | Bad Request — invalid parameters |
+| `401` | Unauthorized — invalid or missing API key |
+| `403` | Forbidden — key lacks required permissions |
+| `404` | Not Found — resource does not exist |
+| `429` | Too Many Requests — rate limit exceeded |
+| `500` | Server Error — something went wrong on our end |
+
+Error responses include a structured body:
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid API key provided",
+  "status": 401
+}
+```
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Authentication" href="/memberships/authentication" icon="key">
+    Create your API key and learn how to authenticate requests.
+  </Card>
+  <Card title="Quickstart" href="/memberships/quickstart" icon="bolt">
+    Make your first API call in under five minutes.
+  </Card>
+  <Card title="Integration Guide" href="/memberships/integration-guide" icon="plug">
+    Explore common integration patterns for CRMs, email platforms, and access control.
+  </Card>
+</CardGroup>

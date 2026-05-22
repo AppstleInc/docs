@@ -1,0 +1,324 @@
+---
+title: "Appstle Loyalty Storefront API reference"
+description: "Appstle Loyalty Storefront API reference for customer-facing endpoints via App Proxy: point earning, redemption, transaction history, VIP tiers, and referrals."
+---
+
+The Storefront API provides customer-facing loyalty functionality through Shopify's App Proxy. Unlike the Admin API, it authenticates using the customer's logged-in Shopify session rather than an API key. Use it to build custom loyalty portals, earning and redemption widgets, and referral pages directly in your storefront theme.
+
+<Warning>
+  Storefront APIs only work from your shop's domain with a logged-in customer session. They cannot be called with an API key or from outside the storefront. For any server-side or external integration, use the [Admin API](/loyalty/admin-api) instead.
+</Warning>
+
+## How Storefront APIs work
+
+All Storefront API requests are routed through Shopify's App Proxy. The proxy:
+
+1. Verifies the customer is logged in
+2. Forwards the request to Appstle's servers with the customer session attached
+3. Returns the response to the storefront
+
+Your theme makes requests to a path like `/apps/loyalty/<endpoint>`, and the App Proxy handles authentication automatically. No API keys are needed in your theme code.
+
+## Customer data
+
+### GET /apps/loyalty/customer
+
+Retrieve the logged-in customer's Shopify customer ID and core loyalty information. This is typically the first call you make to identify the customer before fetching their full loyalty profile.
+
+```javascript
+const response = await fetch('/apps/loyalty/customer');
+const customer = await response.json();
+// { customerId: 12345, email: "customer@example.com" }
+```
+
+---
+
+### GET /apps/loyalty/customer-loyalty
+
+Retrieve the complete loyalty profile for the logged-in customer.
+
+```javascript
+const response = await fetch('/apps/loyalty/customer-loyalty');
+const profile = await response.json();
+```
+
+**Response fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `availablePoints` | number | Points available to redeem |
+| `pendingPoints` | number | Points awaiting approval |
+| `creditedPoints` | number | Total lifetime points earned |
+| `storeCreditBalance` | number | Current store credit balance |
+| `currentVipTier` | string | Active VIP tier name (empty if none) |
+| `customerStatus` | string | `ACTIVE` or `INACTIVE` |
+| `referralLink` | string | Customer's unique referral URL |
+| `referredCompleted` | number | Number of completed referrals |
+| `rewards` | array | Active and past reward objects |
+| `spentAmount` | number | Total amount spent by the customer |
+
+---
+
+## Point earning
+
+### POST /apps/loyalty/earn-points/store-visit
+
+Award points for a store visit. Triggers the store visit earn rule if one is configured in your program.
+
+```javascript
+const response = await fetch('/apps/loyalty/earn-points/store-visit', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+});
+const result = await response.json();
+```
+
+---
+
+### POST /apps/loyalty/earn-points/social
+
+Award points for a social media engagement action (following, subscribing, or sharing). Pass the platform and action type in the request body.
+
+```javascript
+const response = await fetch('/apps/loyalty/earn-points/social', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    platform: 'instagram',
+    action: 'follow',
+  }),
+});
+```
+
+Supported platform values include `facebook`, `twitter`, `instagram`, `youtube`, `tiktok`.
+
+---
+
+## Point redemption
+
+### GET /apps/loyalty/point-redeem-rules
+
+Retrieve the available redemption options for the logged-in customer. Use the returned `id` values to initiate a redemption.
+
+```javascript
+const response = await fetch('/apps/loyalty/point-redeem-rules');
+const rules = await response.json();
+```
+
+Each rule includes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Rule ID — pass as `pointRedeemRuleId` when redeeming |
+| `type` | string | Redemption type (`FIXED_AMOUNT`, `PERCENTAGE`, `FREE_PRODUCT`) |
+| `pointsCost` | number | Points required to redeem |
+| `discountValue` | number | Discount amount or percentage |
+| `discountType` | string | `FIXED_AMOUNT` or `PERCENTAGE` |
+| `maxDiscountAmount` | number | Maximum discount cap (percentage rules only) |
+| `enabled` | boolean | Whether this rule is currently active |
+
+---
+
+### POST /apps/loyalty/redeem-points
+
+Redeem points for a reward using a configured redemption rule.
+
+```javascript
+const response = await fetch('/apps/loyalty/redeem-points', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    pointRedeemRuleId: 42,
+  }),
+});
+const result = await response.json();
+// { discountCode: "REWARD-XXXXX", description: "$5 off your next order" }
+```
+
+---
+
+## Transaction history
+
+### GET /apps/loyalty/transaction-history
+
+Retrieve the logged-in customer's full point transaction history.
+
+```javascript
+const response = await fetch('/apps/loyalty/transaction-history');
+const transactions = await response.json();
+```
+
+Each transaction includes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Transaction ID |
+| `type` | string | `EARN` or `REDEEM` |
+| `points` | number | Points involved (positive for earn, negative for redeem) |
+| `note` | string | Description of the activity |
+| `createdAt` | string | ISO 8601 timestamp |
+| `earnRuleId` | number | Earn rule that triggered the transaction (earn only) |
+| `redeemRuleId` | number | Redemption rule used (redeem only) |
+
+---
+
+## VIP program
+
+### GET /apps/loyalty/vip-tiers
+
+Retrieve all configured VIP tiers and the logged-in customer's current status within each.
+
+```javascript
+const response = await fetch('/apps/loyalty/vip-tiers');
+const tiers = await response.json();
+```
+
+Each tier includes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Tier ID |
+| `name` | string | Tier name (e.g., `Silver`, `Gold`) |
+| `threshold` | number | Spend or points required to qualify |
+| `icon` | string | Display icon |
+| `isCurrentTier` | boolean | Whether this is the customer's active tier |
+| `benefits` | array | Tier-specific benefits and multipliers |
+
+---
+
+## Referral program
+
+### GET /apps/loyalty/referral-link
+
+Retrieve the logged-in customer's unique referral URL.
+
+```javascript
+const response = await fetch('/apps/loyalty/referral-link');
+const data = await response.json();
+// { referralLink: "https://your-store.myshopify.com?ref=abc123" }
+```
+
+---
+
+### POST /apps/loyalty/referral/send-invite
+
+Send a referral invitation email to a friend.
+
+```javascript
+const response = await fetch('/apps/loyalty/referral/send-invite', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    friendEmail: 'friend@example.com',
+    friendName: 'Jane',
+  }),
+});
+```
+
+---
+
+### GET /apps/loyalty/referral/history
+
+Retrieve the logged-in customer's referral history — accepted referrals and associated rewards.
+
+```javascript
+const response = await fetch('/apps/loyalty/referral/history');
+const history = await response.json();
+```
+
+Each referral includes the referred customer's email (partially masked), the referral status, and any rewards issued to both parties.
+
+---
+
+## Product reviews
+
+### POST /apps/loyalty/reviews/submit
+
+Submit a product review. Points are awarded according to your configured review earn rule.
+
+```javascript
+const response = await fetch('/apps/loyalty/reviews/submit', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    productId: 'gid://shopify/Product/12345678',
+    rating: 5,
+    title: 'Great product',
+    body: 'Exceeded my expectations.',
+  }),
+});
+```
+
+**Body parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `productId` | string | Yes | Shopify product GID |
+| `rating` | number | Yes | Rating from 1 to 5 |
+| `title` | string | Yes | Review headline |
+| `body` | string | Yes | Review content |
+
+---
+
+### GET /apps/loyalty/reviews/product/{productId}
+
+Retrieve approved reviews for a specific product.
+
+```javascript
+const productId = encodeURIComponent('gid://shopify/Product/12345678');
+const response = await fetch(`/apps/loyalty/reviews/product/${productId}`);
+const reviews = await response.json();
+```
+
+The response includes the review list, average rating, and total review count for the product.
+
+---
+
+## Customer management
+
+### POST /apps/loyalty/enroll
+
+Enroll the currently logged-in customer in the loyalty program if they are not yet a member.
+
+```javascript
+const response = await fetch('/apps/loyalty/enroll', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+});
+const result = await response.json();
+```
+
+---
+
+### PUT /apps/loyalty/update-birth-date
+
+Set or update the customer's date of birth to enable birthday reward automation.
+
+```javascript
+const response = await fetch('/apps/loyalty/update-birth-date', {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ birthDate: '1990-06-15' }),
+});
+```
+
+---
+
+## Error handling
+
+Storefront API responses use standard HTTP status codes.
+
+| Code | Meaning |
+|------|---------|
+| `200` | Request completed successfully |
+| `400` | Invalid request parameters |
+| `401` | Customer is not logged in |
+| `404` | Resource not found (customer not enrolled, product not found, etc.) |
+| `429` | Rate limit exceeded |
+| `500` | Server error |
+
+When a customer is not logged in, the App Proxy redirects to the store's login page. Ensure your theme handles the case where the customer session is missing before making API calls.
+
+<Tip>
+  Read the customer's `availablePoints` and `customerStatus` from the `customer-loyalty` endpoint before rendering earning or redemption UI. If `customerStatus` is `INACTIVE` or the customer has no loyalty profile, prompt them to enroll first.
+</Tip>

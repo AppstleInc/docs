@@ -1,0 +1,447 @@
+---
+title: "Automate subscriptions with Shopify Flow"
+sidebarTitle: "Shopify Flow"
+description: "Use Appstle's Shopify Flow triggers and actions to automate subscription workflows without API tokens — everything runs in Shopify's authenticated context."
+---
+
+Appstle Subscriptions integrates natively with [Shopify Flow](https://www.shopify.com/flow), Shopify's built-in automation platform. You can build powerful subscription automation — pausing after failed payments, applying loyalty discounts, swapping seasonal products — without managing API keys or writing backend code. Flow runs within Shopify's authenticated context, so no credentials are required.
+
+<Note>
+  Shopify Flow is available on **Shopify Basic plan and above**. The Appstle Flow integration must be enabled in your Appstle admin before creating workflows.
+</Note>
+
+## Getting started
+
+<Steps>
+  <Step title="Enable the integration">
+    In the Appstle admin, go to **Settings → Integrations → Shopify Flow** and enable the integration.
+  </Step>
+  <Step title="Open the Flow editor">
+    Navigate to the [Shopify Flow editor](https://admin.shopify.com/store/YOUR_STORE/apps/flow) in your Shopify admin.
+  </Step>
+  <Step title="Create a workflow">
+    Click **Create workflow**, choose an Appstle trigger, add conditions if needed, and attach Appstle actions.
+  </Step>
+</Steps>
+
+## Triggers
+
+Triggers fire automatically when subscription events occur. All triggers include the full subscription and customer property sets described below.
+
+### Subscription lifecycle
+
+| Trigger | Description |
+|---------|-------------|
+| Subscription Created | Fires when a new subscription contract is created |
+| Subscription Activated | Fires when a subscription is activated from paused or cancelled status |
+| Subscription Cancelled | Fires when a subscription is cancelled |
+| Subscription Paused | Fires when a subscription is paused |
+| Subscription Updated | Fires when subscription details change (products, quantity, address, etc.) |
+
+### Billing events
+
+| Trigger | Description |
+|---------|-------------|
+| Subscription Billing Success | Fires when a billing attempt succeeds |
+| Subscription Billing Failure | Fires when a billing attempt fails |
+| Upcoming Order Notification | Fires when an upcoming order notification is sent based on configured buffer days |
+
+### Schedule changes
+
+| Trigger | Description |
+|---------|-------------|
+| Subscription Billing Interval Changed | Fires when the billing frequency is changed |
+| Subscription Next Order Date Changed | Fires when the next billing/order date is modified |
+
+## Trigger properties
+
+### Subscription properties
+
+Included with every trigger:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Subscription ID` | Number | Internal subscription contract ID |
+| `GraphQL Subscription ID` | String | GraphQL ID of the subscription contract |
+| `Status` | String | `ACTIVE`, `PAUSED`, `CANCELLED`, `EXPIRED`, or `FAILED` |
+| `Next Billing Date` | String | Next billing date in UTC ISO 8601. Empty string if not `ACTIVE`. |
+| `Billing Interval` | String | Billing frequency unit: `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `Billing Interval Count` | Number | Number of intervals between billings (e.g. `2` + `MONTH` = every 2 months) |
+| `Delivery Interval` | String | Delivery frequency unit: `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `Delivery Interval Count` | Number | Number of intervals between deliveries |
+| `Original Order ID` | Number | ID of the first order. `0` for imported contracts. |
+| `Original Order Name` | String | Name of the first order. Empty string for imported contracts. |
+| `Cancel Reason` | String | Reason for cancellation (empty string if not cancelled) |
+| `Pause Reason` | String | Reason for pause (empty string if not paused) |
+| `Total Successful Orders` | Number | Total successfully completed orders for this contract |
+| `Line Items` | Array | Array of line items (see schema below) |
+| `Order Note Attributes` | Array | Array of key-value note attributes |
+
+### Customer properties
+
+Included with every trigger:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `customer_reference` | Reference | Shopify customer reference |
+| `Customer Email` | Email | Customer's email address |
+| `Customer Phone` | String | Customer's phone number (empty string if not available) |
+| `Customer Display Name` | String | Customer's display name |
+| `Customer First Name` | String | Customer's first name |
+| `Customer Last Name` | String | Customer's last name |
+
+### Billing event properties
+
+For **Subscription Billing Success**, **Subscription Billing Failure**, and **Upcoming Order Notification** only:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Billing Attempt ID` | Number | ID of the billing attempt |
+| `Billing Attempt Status` | String | `SUCCESS`, `FAILURE`, `PENDING`, or `SCHEDULED` |
+| `Billing Attempt Count` | Number | Number of billing attempts |
+| `Billing Date` | String | Scheduled billing date (UTC ISO 8601) |
+| `Billing Attempt Time` | String | Actual attempt timestamp (UTC ISO 8601) |
+
+For **Subscription Billing Success** only:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Recurring Order ID` | Number | Order ID from successful renewal |
+| `Recurring Order Name` | String | Order name from successful renewal |
+| `order_reference` | Reference | Shopify order reference |
+
+### Subscription Updated properties
+
+For the **Subscription Updated** trigger only:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Contract Amount` | Number | Total line item amount in contract currency |
+| `Contract Amount USD` | Number | Total line item amount converted to USD |
+
+### Line items schema
+
+Each object in the `Line Items` array contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `lineItemId` | String | ID of the line item |
+| `variantId` | Float | Shopify variant ID |
+| `graphqlVariantId` | String | GraphQL variant ID |
+| `productId` | ID | Shopify product ID (GraphQL format) |
+| `quantity` | Int | Quantity |
+| `graphqlSellingPlanId` | String | Selling plan ID for this line |
+| `sellingPlanName` | String | Selling plan name |
+| `customAttributes` | Array | Key-value custom attributes on the line item |
+
+## Actions
+
+All actions return at minimum a `success_message` output field. Every action is logged in the subscription activity log with source `SHOPIFY_FLOW`.
+
+### Line item management
+
+<AccordionGroup>
+  <Accordion title="Add Line Item">
+    Add a product variant to an existing subscription.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `product_variant_id` | String | Yes | Shopify product variant ID to add |
+    | `quantity` | String | Yes | Quantity to add |
+    | `is_one_time_product` | String | | `"true"` to add as a non-recurring line item. Default: `"false"` |
+
+    **Output fields:** `contract_id`, `product_variant_id`, `quantity`, `is_one_time_product`, `success_message`
+  </Accordion>
+  <Accordion title="Remove Line Item">
+    Remove a product from a subscription.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `line_id` | String | Yes | Line item ID to remove |
+    | `remove_discount` | String | | Whether to also remove the associated discount |
+
+    **Output fields:** `contract_id`, `line_id`, `remove_discount`, `success_message`
+  </Accordion>
+  <Accordion title="Update Line Item Quantity">
+    Change the quantity of a product in a subscription.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `line_id` | String | Yes | Line item ID |
+    | `quantity` | String | Yes | New quantity |
+
+    **Output fields:** `contract_id`, `line_id`, `quantity`, `success_message`
+  </Accordion>
+  <Accordion title="Update Line Item Price">
+    Change the price of a product in a subscription.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `line_id` | String | Yes | Line item ID |
+    | `base_price` | String | Yes | New base price |
+    | `remove_pricing_policy` | Boolean | | Remove the existing pricing policy. Default: `false` |
+
+    **Output fields:** `contract_id`, `line_id`, `base_price`, `remove_pricing_policy`, `success_message`
+  </Accordion>
+  <Accordion title="Update Line Item Attributes">
+    Update custom attributes on a line item.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `line_id` | String | Yes | Line item ID |
+    | `attributes` | String | Yes | JSON array of key-value pairs |
+
+    **Output fields:** `contract_id`, `line_id`, `success_message`
+  </Accordion>
+  <Accordion title="Replace Variant">
+    Swap a product variant for another in a subscription.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `old_variant_id` | String | Yes | Comma-separated variant IDs to replace |
+    | `new_variant_id` | String | Yes | Comma-separated variant IDs with optional quantities (e.g. `11111:2,22222:1`) |
+    | `old_line_id` | String | | Specific line ID when multiple lines share the same variant |
+    | `carry_forward_discount` | String | | Whether to carry the existing discount to the new variant |
+
+    **Output fields:** `contract_id`, `old_variant_id`, `new_variant_id`, `success_message`
+  </Accordion>
+</AccordionGroup>
+
+### Subscription management
+
+<AccordionGroup>
+  <Accordion title="Update Subscription Status">
+    Set a subscription's status to Active, Paused, or Cancelled.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `status` | String | Yes | `ACTIVE`, `PAUSED`, or `CANCELLED` |
+
+    **Output fields:** `contract_id`, `status`, `success_message`
+  </Accordion>
+  <Accordion title="Hide Subscription">
+    Hide a subscription from the customer portal.
+
+    **Input fields:** `contract_id` (required)
+
+    **Output fields:** `contract_id`, `success_message`
+  </Accordion>
+  <Accordion title="Merge Subscriptions">
+    Combine two subscriptions into one.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `source_contract_id` | String | Yes | Contract ID to merge from |
+    | `destination_contract_id` | String | Yes | Contract ID to merge into |
+
+    **Output fields:** `source_contract_id`, `destination_contract_id`, `success_message`
+  </Accordion>
+  <Accordion title="Split Subscription">
+    Split specific line items out into a new subscription contract.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `line_ids` | String | Yes | Comma-separated line item IDs to move |
+    | `attempt_billing` | String | | Whether to immediately bill the new contract after splitting |
+
+    **Output fields:** `original_contract_id`, `new_contract_id`, `line_ids_moved`, `success_message`
+  </Accordion>
+  <Accordion title="Update Order Note / Update Note Attributes">
+    **Update Order Note** — sets the order note text on a subscription. Required: `contract_id`, `order_note`.
+
+    **Update Note Attributes** — sets custom key-value note attributes. Required: `contract_id`, `note_attributes` (JSON array). Optional: `overwrite_existing` (boolean, default `false`). Output includes `attributes_count`.
+  </Accordion>
+</AccordionGroup>
+
+### Billing & schedule
+
+<AccordionGroup>
+  <Accordion title="Update Billing Interval">
+    Change the billing frequency.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `billing_interval_count` | String | Yes | Number of intervals between billings |
+    | `billing_interval` | String | Yes | `DAY`, `WEEK`, `MONTH`, or `YEAR` |
+
+    **Output fields:** `contract_id`, `billing_interval_count`, `billing_interval`, `success_message`
+  </Accordion>
+  <Accordion title="Update Frequency by Selling Plan">
+    Change billing and delivery frequency using an existing selling plan.
+
+    **Input fields:** `contract_id` (required), `selling_plan_id` (required)
+
+    **Output fields:** `contract_id`, `selling_plan_id`, `selling_plan_name`, `billing_interval_count`, `billing_interval`, `delivery_interval_count`, `delivery_interval`, `success_message`
+  </Accordion>
+  <Accordion title="Update Billing Date">
+    Reschedule the next billing date. Dates must use ISO 8601 format: `2026-03-15T10:00:00Z`.
+
+    **Input fields:** `contract_id` (required), `next_billing_date` (required)
+
+    **Output fields:** `contract_id`, `next_billing_date`, `success_message`
+  </Accordion>
+  <Accordion title="Skip Order">
+    Skip (or unskip) the next scheduled order.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `line_id` | String | Yes | Line item ID |
+    | `is_skip` | Boolean | | `true` to skip, `false` to unskip. Default: `true` |
+
+    **Output fields:** `contract_id`, `line_id`, `is_skip`, `success_message`
+  </Accordion>
+  <Accordion title="Attempt Billing">
+    Trigger immediate billing. Requires either `contract_id` or `billing_attempt_id`.
+
+    <Warning>
+      The Attempt Billing action requires additional permission. Contact [support@appstle.com](mailto:support@appstle.com) to enable it for your store.
+    </Warning>
+
+    **Output fields:** `contract_id`, `success_message`
+  </Accordion>
+  <Accordion title="Update Max / Min Cycles">
+    **Update Max Cycles** — set the maximum billing cycles before auto-cancellation. Required: `contract_id`, `max_cycles`.
+
+    **Update Min Cycles** — set the minimum billing cycles before the customer can cancel. Required: `contract_id`, `min_cycles`.
+  </Accordion>
+</AccordionGroup>
+
+### Discounts & pricing
+
+<AccordionGroup>
+  <Accordion title="Apply Discount Code">
+    Apply a discount code to a subscription.
+
+    **Input fields:** `contract_id` (required), `discount_code` (required)
+
+    **Output fields:** `contract_id`, `discount_code`, `success_message`
+  </Accordion>
+  <Accordion title="Remove Discount">
+    Remove a discount. Provide either `discount_id` or `discount_code`.
+
+    **Input fields:** `contract_id` (required), `discount_id` or `discount_code` (one required)
+
+    **Output fields:** `contract_id`, `discount_id`, `success_message`
+  </Accordion>
+  <Accordion title="Update Pricing Policy">
+    Update pricing policy with cycle-based discounts.
+
+    **Input fields:**
+
+    | Field | Type | Required | Description |
+    |-------|------|----------|-------------|
+    | `contract_id` | String | Yes | Subscription contract ID |
+    | `base_price` | String | Yes | Base price for the line item |
+    | `line_id` | String | | Specific line item ID — if omitted, applies to all lines |
+    | `cycles` | String | | JSON defining cycle-based pricing adjustments |
+    | `overwrite_existing` | Boolean | | Replace existing pricing policy. Default: `false` |
+
+    **Output fields:** `contract_id`, `line_id`, `base_price`, `success_message`
+  </Accordion>
+</AccordionGroup>
+
+### Delivery & shipping
+
+<AccordionGroup>
+  <Accordion title="Update Delivery Interval">
+    Change the delivery frequency.
+
+    **Input fields:** `contract_id` (required), `delivery_interval_count` (required), `delivery_interval` (required — `DAY`, `WEEK`, `MONTH`, or `YEAR`)
+  </Accordion>
+  <Accordion title="Update Delivery Method">
+    Change the shipping method on a subscription.
+
+    **Input fields:** `contract_id` (required), `delivery_method_title` (required). Optional: `delivery_method_code`, `delivery_method_presentment_title`, `delivery_method_id`.
+  </Accordion>
+  <Accordion title="Update Delivery Price">
+    Change the shipping price. Required: `contract_id`, `delivery_price`.
+  </Accordion>
+  <Accordion title="Update Shipping Address">
+    Update the delivery address.
+
+    **Required fields:** `contract_id`, `address1`, `city`, `country_code`
+
+    **Optional fields:** `address2`, `province`, `province_code`, `zip`, `country`, `first_name`, `last_name`, `phone`, `company`
+  </Accordion>
+  <Accordion title="Update Payment Method">
+    Send a payment method update request to the customer. Required: `contract_id`.
+  </Accordion>
+</AccordionGroup>
+
+## Example workflows
+
+<AccordionGroup>
+  <Accordion title="Auto-pause after 3 failed payments">
+    **Trigger:** Subscription Billing Failure
+
+    **Condition:** Billing Attempt Count ≥ 3
+
+    **Action:** Update Subscription Status → `PAUSED`
+  </Accordion>
+  <Accordion title="Apply loyalty discount after 6 months">
+    **Trigger:** Subscription Billing Success
+
+    **Condition:** Total Successful Orders ≥ 6
+
+    **Action:** Apply Discount Code → `LOYAL10`
+  </Accordion>
+  <Accordion title="Notify team on high-value cancellation">
+    **Trigger:** Subscription Cancelled
+
+    **Condition:** Contract Amount > 100
+
+    **Action:** Send Slack notification (via Shopify Flow's Slack connector)
+  </Accordion>
+  <Accordion title="Auto-swap seasonal products">
+    **Trigger:** Scheduled (monthly, via Shopify Flow's scheduler)
+
+    **Action:** Replace Variant → swap old variant ID for new variant ID
+  </Accordion>
+</AccordionGroup>
+
+## Field reference
+
+**Attributes JSON format** — for `attributes` and `note_attributes` fields:
+
+```json
+[
+  {"key": "gift_message", "value": "Happy Birthday!"},
+  {"key": "delivery_instructions", "value": "Leave at door"}
+]
+```
+
+**Replace Variant format:**
+- `old_variant_id`: comma-separated IDs to replace — `12345,67890`
+- `new_variant_id`: comma-separated IDs with optional quantities — `11111:2,22222:1`

@@ -1,0 +1,379 @@
+---
+title: "Appstle Loyalty Shopify metafields and customer tags"
+description: "Shopify metafields and tags set by Appstle Loyalty: loyalty profiles, reward codes, product reviews, VIP tags, and referral tags — with schema examples."
+---
+
+Appstle Loyalty uses Shopify metafields and customer tags to persist loyalty data, power storefront widgets, surface product reviews, and enable automation in Shopify Flow and Liquid themes. This page documents every metafield and tag — what it contains, when it is updated, and how to use it in your integration or theme.
+
+## Metafield namespaces
+
+Appstle Loyalty writes to three namespaces across shop, customer, and product resources.
+
+| Namespace | Resources | Visibility | Purpose |
+|-----------|-----------|------------|---------|
+| `appstle_loyalty` | Shop, Customer | Public | Loyalty configuration and customer loyalty profiles |
+| `$app:appstle_loyalty` | Customer | Private | Customer reward discount codes for checkout |
+| `appstle_review` | Product, Shop | Public | Product reviews, ratings, and carousel data |
+
+<Info>
+  The `$app:appstle_loyalty` namespace uses Shopify's app-owned metafield protection. Only the Appstle Loyalty app can read and write it. Themes, Liquid templates, and other apps cannot access it.
+</Info>
+
+## Shop metafields — `appstle_loyalty`
+
+These metafields store the complete loyalty program configuration. They are written whenever a merchant saves settings in the Appstle admin, and updates are immediate.
+
+### Core configuration
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `app_url` | string | App base URL for widget communication |
+| `proxy_path_prefix` | string | Custom proxy path prefix (default: `apps/loyalty`) |
+| `public_domain` | string | Store's public domain |
+| `shop_name` | string | Store name from Shopify |
+| `currency` | string | ISO currency code (e.g., `USD`, `EUR`) |
+| `store_front_access_token` | string | Shopify Storefront API access token |
+
+### Widget configuration
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `bundle_js_path` | url | CDN URL for the widget JavaScript bundle |
+| `bundle_css_path` | url | CDN URL for the widget CSS bundle |
+| `widget_setting` | json | Full widget configuration (colors, layout, positioning) |
+| `shop_labels` | json | Widget label translations for i18n support |
+
+### Points configuration
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `pointRoundType` | string | Rounding strategy: `NO_ROUND`, `ROUND_DOWN`, or `ROUND_UP` |
+| `point_earn_rules` | json | Array of active point earn rules |
+| `point_redeem_rules` | json | Array of active point redemption rules |
+
+<AccordionGroup>
+  <Accordion title="Example: point_earn_rules">
+    ```json
+    [
+      {
+        "id": 123,
+        "type": "PURCHASE",
+        "pointsPerDollar": 5,
+        "minimumOrderAmount": 0,
+        "enabled": true
+      },
+      {
+        "id": 124,
+        "type": "SIGNUP",
+        "fixedPoints": 100,
+        "enabled": true
+      },
+      {
+        "id": 125,
+        "type": "BIRTHDAY",
+        "fixedPoints": 200,
+        "enabled": true
+      }
+    ]
+    ```
+  </Accordion>
+  <Accordion title="Example: point_redeem_rules">
+    ```json
+    [
+      {
+        "id": 456,
+        "type": "FIXED_AMOUNT",
+        "pointsCost": 500,
+        "discountValue": 5.00,
+        "discountType": "FIXED_AMOUNT",
+        "enabled": true
+      },
+      {
+        "id": 457,
+        "type": "PERCENTAGE",
+        "pointsCost": 1000,
+        "discountValue": 10,
+        "discountType": "PERCENTAGE",
+        "maxDiscountAmount": 50.00,
+        "enabled": true
+      }
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Feature flags
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `enable_inactive_customer` | boolean | Allow tracking inactive customers |
+| `has_dedicated_page_access` | boolean | Dedicated loyalty page feature enabled |
+| `allow_customer_opt_in` | boolean | Customers can self-enroll in the program |
+| `enable_discount_to_apply_automatically` | boolean | Auto-apply reward discounts at checkout |
+| `show_store_credit_rewards` | boolean | Show store credit rewards in the widget |
+| `birthdate_format` | string | Expected birthdate format (`MM/DD`, `DD/MM`, etc.) |
+
+### VIP tier configuration
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `vip_tier_enabled` | boolean | VIP tier program enabled |
+| `vip_tiers` | json | Array of VIP tier definitions |
+| `vip_rewards` | json | VIP tier-specific redemption rules |
+| `vip_point_rewards` | json | VIP tier-specific earn rules |
+| `vip_tier_setting` | json | VIP tier global configuration |
+
+<AccordionGroup>
+  <Accordion title="Example: vip_tiers">
+    ```json
+    [
+      {
+        "id": 1,
+        "name": "Silver",
+        "threshold": 0,
+        "icon": "🥈",
+        "additionalTags": "silver-member"
+      },
+      {
+        "id": 2,
+        "name": "Gold",
+        "threshold": 1000,
+        "icon": "🥇",
+        "additionalTags": "gold-member, premium-support"
+      },
+      {
+        "id": 3,
+        "name": "Platinum",
+        "threshold": 5000,
+        "icon": "💎",
+        "additionalTags": "platinum-member, priority-shipping, premium-support"
+      }
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Referral configuration
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `referral_enabled` | boolean | Referral program enabled |
+| `referral_loyalty` | json | Referral discount types, amounts, and point rewards |
+
+<AccordionGroup>
+  <Accordion title="Example: referral_loyalty">
+    ```json
+    {
+      "referrerDiscountType": "PERCENTAGE",
+      "referrerDiscountValue": 10,
+      "referredDiscountType": "FIXED_AMOUNT",
+      "referredDiscountValue": 5.00,
+      "referrerPoints": 500,
+      "referredPoints": 200
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Points expiration
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `points_expiration_setting` | json | Expiration interval and type |
+
+```json
+{
+  "enabled": true,
+  "interval": 12,
+  "intervalType": "MONTH"
+}
+```
+
+## Customer metafields — `appstle_loyalty`
+
+### `customer_loyalty`
+
+The customer loyalty profile is stored as a JSON metafield on each enrolled customer. It is updated by the Appstle Lambda processor after every loyalty event — points earned or redeemed, VIP tier changes, referrals, social engagement, and more. Updates are near real-time, typically within a few seconds.
+
+**Access in Liquid:**
+
+```liquid
+{{ customer.metafields.appstle_loyalty.customer_loyalty }}
+```
+
+**Full schema:**
+
+```json
+{
+  "availablePoints": 1250,
+  "pendingPoints": 100,
+  "redeemedPoints": 500,
+  "creditedPoints": 1850,
+  "vipTier": {
+    "id": 2,
+    "name": "Gold"
+  },
+  "achievableTierId": 3,
+  "activeRewards": [
+    {
+      "discountCode": "REWARD-XYZ789",
+      "discountType": "PERCENTAGE",
+      "discountValue": 10
+    }
+  ],
+  "socialMediaEngagement": {
+    "facebook": true,
+    "twitter": false,
+    "instagram": true,
+    "youtube": false,
+    "tiktok": false,
+    "pinterest": false,
+    "newsletter": true,
+    "sms": false,
+    "accountCreation": true,
+    "sharing": false
+  },
+  "referralInfo": {
+    "referralLink": "https://store.myshopify.com/?ref=abc123",
+    "completedReferrals": 3
+  },
+  "customerStatus": "ACTIVE",
+  "dateOfBirth": "1990-05-15",
+  "storeCreditBalance": 25.00,
+  "lastActivityDate": "2025-03-20T14:30:00Z",
+  "spentAmount": 450.75
+}
+```
+
+## Customer metafields — `$app:appstle_loyalty`
+
+### `customer_rewards`
+
+Stores the customer's unredeemed reward discount codes. This metafield is private — it is used by Shopify's discount function to auto-apply rewards at checkout and cannot be read by themes, Liquid templates, or other apps.
+
+```json
+{
+  "rewards": [
+    { "discountCode": "REWARD-ABC123" },
+    { "discountCode": "REWARD-DEF456" }
+  ]
+}
+```
+
+## Product metafields — `appstle_review`
+
+Review metafields are written on individual product resources when a review is approved, updated, or deleted. Access them in Liquid via `{{ product.metafields.appstle_review.<key> }}`.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `product_reviews` | json | Approved reviews for the product page (max 5 per page) |
+| `total_reviews` | integer | Total review count |
+| `rating` | rating | Overall rating using Shopify's native rating type (scale 1–5) |
+| `product_rating_details` | json | Breakdown by star rating |
+
+<AccordionGroup>
+  <Accordion title="Example: product_reviews">
+    ```json
+    [
+      {
+        "id": 789,
+        "author": "John D.",
+        "rating": 5,
+        "title": "Amazing product!",
+        "body": "This is the best coffee I've ever had.",
+        "createdAt": "2025-03-15T10:00:00Z",
+        "verified": true
+      }
+    ]
+    ```
+  </Accordion>
+  <Accordion title="Example: rating (Shopify native type)">
+    ```json
+    {
+      "value": "4.5",
+      "scale_min": "1",
+      "scale_max": "5"
+    }
+    ```
+
+    The native `rating` type integrates directly with Shopify's built-in rating display and Google rich results.
+  </Accordion>
+  <Accordion title="Example: product_rating_details">
+    ```json
+    {
+      "5": 42,
+      "4": 18,
+      "3": 7,
+      "2": 2,
+      "1": 1
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Shop metafields — `appstle_review`
+
+These metafields power the review carousel widget on your homepage.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `carousel_product_reviews` | json | Recent or featured reviews (max 15) |
+| `carousel_total_reviews` | integer | Total review count for the carousel |
+| `carousel_rating` | rating | Overall rating for the carousel display |
+
+## Customer tags
+
+Appstle Loyalty applies tags only to customer resources — not orders or products.
+
+### VIP tier name tags
+
+When a customer achieves or is assigned a VIP tier, the tier's name is applied as a customer tag (e.g., `Silver`, `Gold`, `Platinum`). When the tier changes, the old name tag is removed and the new one is added. Only one tier name tag is active at a time.
+
+**Tags are applied by:**
+- Automatic tier calculation based on spend, points, or order thresholds
+- Manual tier assignment in the Appstle admin
+- Referral flow tier assignment
+- Shopify Flow `Assign VIP Tier` action
+- Bulk operations
+
+### Additional VIP tier tags
+
+Each VIP tier can be configured with a comma-separated list of `additionalTags`. These are applied alongside the tier name tag and removed together with it on tier change.
+
+For example, a Gold tier configured with `additionalTags = "premium-member, vip-support"` applies three tags when a customer reaches Gold: `Gold`, `premium-member`, `vip-support`. All three are replaced when the customer moves to the next tier.
+
+### Referral tags
+
+When a referral is accepted by both parties, permanent tags are applied to record the relationship.
+
+| Tag pattern | Applied to | Description |
+|-------------|-----------|-------------|
+| `referral:{referredCustomerId}` | The referrer | Records which customer was referred |
+| `referred:{referrerCustomerId}` | The referred customer | Records who referred them |
+
+These tags are never removed.
+
+**Example:** Customer A (ID `1111`) refers Customer B (ID `2222`):
+- Customer A receives tag `referral:2222`
+- Customer B receives tag `referred:1111`
+
+### Product review tag
+
+The tag `Wrote Appstle Web Review` is permanently applied to any new Shopify customer account that is created as a result of a product review submission (i.e., the customer did not already have a Shopify account).
+
+## Frequently asked questions
+
+<AccordionGroup>
+  <Accordion title="Can I read loyalty metafields from a Liquid theme?">
+    Yes. Metafields in the `appstle_loyalty` and `appstle_review` namespaces are public. Access them in Liquid via `{{ customer.metafields.appstle_loyalty.customer_loyalty }}` or `{{ product.metafields.appstle_review.rating }}`. The `customer_rewards` metafield in the `$app:appstle_loyalty` namespace is private and cannot be accessed from Liquid or other apps.
+  </Accordion>
+  <Accordion title="How quickly are customer loyalty metafields updated?">
+    Customer loyalty metafields are updated by the Lambda processor after every loyalty event. Updates are near real-time — typically within a few seconds of the event occurring.
+  </Accordion>
+  <Accordion title="What happens to VIP tier tags when a customer is upgraded?">
+    When a customer's tier changes, the old tier name tag and all its configured `additionalTags` are removed. The new tier name tag and its `additionalTags` are then added. Only one tier's tags are active at any given time.
+  </Accordion>
+  <Accordion title="Can other apps read the customer_rewards discount codes?">
+    No. The `customer_rewards` metafield uses the `$app:appstle_loyalty` private namespace, which can only be read and written by the Appstle Loyalty app. This prevents discount codes from being exposed to unauthorized apps or themes.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,250 @@
+---
+title: "Appstle Subscriptions integration guide"
+sidebarTitle: "Integration guide"
+description: "Integrate with Appstle Subscriptions: authentication, base URL, subscription management, product operations, discounts, shipping, past orders, and partner keys."
+---
+
+This guide covers everything you need to build a full integration with Appstle Subscriptions. It assumes you already have an API key — if not, see the [Authentication](/subscription/authentication) page first.
+
+## Base URL
+
+All Admin API endpoints share this base URL:
+
+```
+https://subscription-admin.appstle.com/api/external/v2/
+```
+
+## Authentication
+
+Pass your API key in the `X-API-Key` header on every request:
+
+```bash
+curl -H "X-API-Key: apst_your-api-key-here" \
+  "https://subscription-admin.appstle.com/api/external/v2/..."
+```
+
+For partner integrations (third-party products connecting on behalf of merchants), add the `X-App-Key` header as well:
+
+```bash
+curl -H "X-API-Key: apst_merchant-api-key" \
+     -H "X-App-Key: your-partner-key" \
+     "https://subscription-admin.appstle.com/api/external/v2/..."
+```
+
+See the [Authentication](/subscription/authentication) page for full details on key management and partner keys.
+
+## Looking up customer subscriptions
+
+### Get all subscriptions for a customer
+
+```bash
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/{customerId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+The response includes active, paused, and cancelled subscriptions along with products, next billing date, shipping address, and delivery method.
+
+### Check if a customer has active subscriptions
+
+Returns an array of subscription contract IDs. An empty array means no active subscriptions.
+
+```bash
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/{customerId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Get full contract details
+
+```bash
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contract-details?contractId={contractId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Get upcoming orders
+
+```bash
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-billing-attempts/top-orders?contractId={contractId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Subscription management
+
+### Cancel a subscription
+
+```bash
+curl -X DELETE \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts/{contractId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Pause a subscription
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-status" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "status": "PAUSED"}'
+```
+
+### Resume a subscription
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-status" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "status": "ACTIVE"}'
+```
+
+Valid `status` values are `ACTIVE`, `PAUSED`, and `CANCELLED`.
+
+### Reschedule the next billing date
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-billing-date" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "nextBillingDate": "2026-03-15T00:00:00Z"}'
+```
+
+### Update billing frequency
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-billing-interval" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "billingIntervalCount": 2, "billingInterval": "MONTH"}'
+```
+
+Valid `billingInterval` values: `DAY`, `WEEK`, `MONTH`, `YEAR`.
+
+### Skip an upcoming order
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-billing-attempts/skip-order/{billingAttemptId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Product management
+
+### Add a product to a subscription
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-add-line-item" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "variantId": "{variantId}", "quantity": 1}'
+```
+
+### Remove a product from a subscription
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-remove-line-item" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "lineId": "{lineId}"}'
+```
+
+### Update product quantity
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-line-item-quantity" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "lineId": "{lineId}", "quantity": 3}'
+```
+
+## Discounts
+
+### Apply a discount code
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-apply-discount" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}", "discountCode": "SAVE10"}'
+```
+
+### Remove a discount
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-remove-discount" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contractId": "{contractId}"}'
+```
+
+## Shipping
+
+### Update shipping address
+
+```bash
+curl -X PUT \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-contracts-update-shipping-address" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contractId": "{contractId}",
+    "address1": "123 Main St",
+    "city": "San Francisco",
+    "province": "California",
+    "country": "United States",
+    "zip": "94105"
+  }'
+```
+
+## Past orders
+
+### Get order history
+
+```bash
+curl -X GET \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-billing-attempts/past-orders?contractId={contractId}" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Rate limits
+
+Requests are rate-limited per store. If you receive a `429 Too Many Requests` response, implement exponential backoff before retrying. Do not immediately retry at full speed.
+
+## Partner integrations
+
+If you are building a platform that connects to Appstle on behalf of multiple merchants, you can apply for a dedicated partner key. Partner keys:
+
+- Allow your customers (merchants) to connect to your platform without needing an Appstle API subscription
+- Are provisioned by Appstle and remain constant across all merchants using your integration
+- Must be sent alongside the merchant's `X-API-Key` in every request
+
+Current integration partners include ShipInsure, Zapiet, Zaymo, and OrderLogix.
+
+To apply, email [support@appstle.com](mailto:support@appstle.com) with your company name, product description, and expected API call volume per merchant. Partner keys are typically provisioned within 1–2 business days.
+
+## Further reading
+
+<CardGroup cols={2}>
+  <Card title="Admin API reference" icon="code" href="/subscription/admin-api">
+    All available endpoints with request/response details.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/subscription/webhooks">
+    Receive real-time events when subscriptions change.
+  </Card>
+  <Card title="Shopify Flow" icon="bolt" href="/subscription/shopify-flow">
+    No-code automation using Shopify's built-in workflow engine.
+  </Card>
+  <Card title="Authentication" icon="key" href="/subscription/authentication">
+    Key creation, rotation, and partner key details.
+  </Card>
+</CardGroup>

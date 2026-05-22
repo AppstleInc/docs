@@ -1,0 +1,233 @@
+---
+title: "Appstle Subscriptions frequently asked questions"
+sidebarTitle: "FAQ"
+description: "Answers to common questions about widget customization, detecting subscription orders, customer portal setup, API authentication, and data privacy."
+---
+
+Answers to the questions developers most commonly ask when integrating with Appstle Subscriptions.
+
+## Widget & storefront
+
+<AccordionGroup>
+  <Accordion title="Do I need the Appstle API to build a custom subscription widget?">
+    No. You do not need any Appstle API to display subscription options on product pages or add subscriptions to cart.
+
+    All selling plan data is already available in Shopify's native product JSON. When you create subscription plans in the Appstle admin, Shopify automatically includes them in the product data on every product page.
+
+    **Read selling plans from the product JSON endpoint:**
+
+    ```javascript
+    fetch('/products/your-product-handle.js')
+      .then(response => response.json())
+      .then(product => {
+        // All selling plans are here
+        console.log(product.selling_plan_groups);
+      });
+    ```
+
+    **Read selling plans in Liquid:**
+
+    ```liquid
+    {% for selling_plan_group in product.selling_plan_groups %}
+      <h3>{{ selling_plan_group.name }}</h3>
+      {% for selling_plan in selling_plan_group.selling_plans %}
+        <option value="{{ selling_plan.id }}">{{ selling_plan.name }}</option>
+      {% endfor %}
+    {% endfor %}
+    ```
+
+    **Add a subscription to cart:**
+
+    ```javascript
+    fetch('/cart/add.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: variantId,
+        quantity: 1,
+        selling_plan: sellingPlanId  // From product.selling_plan_groups
+      })
+    });
+    ```
+
+    The Appstle APIs are useful when you need to manage existing subscriptions — not for displaying or creating them at checkout.
+  </Accordion>
+
+  <Accordion title="Can I customize the subscription widget appearance?">
+    Yes. There are four approaches:
+
+    1. **CSS overrides** — The widget uses classes prefixed with `appstle_` that you can target in your theme CSS.
+    2. **Merchant portal settings** — Configure widget text, labels, and layout options directly in the Appstle admin without writing code.
+    3. **JavaScript hooks** — Listen to [widget events](/subscription/javascript-hooks) to add custom behavior when the widget loads, when the customer selects a plan, etc.
+    4. **Build your own widget** — Use Shopify's native `selling_plan_groups` product data to build a completely custom widget.
+  </Accordion>
+
+  <Accordion title="How does the subscription widget load on my storefront?">
+    The `appstle-subscription.js` script is automatically injected into your storefront when the app is installed. It:
+
+    1. Reads the product's `selling_plan_groups` from Shopify's native product JSON
+    2. Renders the subscription widget based on your Appstle admin configuration
+    3. Handles selling plan selection and cart integration
+    4. Dispatches [JavaScript events](/subscription/javascript-hooks) you can hook into
+
+    No API calls to Appstle servers are made to display the widget — everything comes from Shopify's product data.
+  </Accordion>
+</AccordionGroup>
+
+## Subscriptions & orders
+
+<AccordionGroup>
+  <Accordion title="What happens when a customer subscribes?">
+    1. The customer selects a subscription option and adds the product to cart
+    2. At checkout, Shopify creates a **subscription contract** linked to the selling plan
+    3. Appstle manages the recurring billing cycle, sending billing attempts to Shopify at the configured frequency
+    4. Shopify processes the payment and creates new orders automatically on each cycle
+  </Accordion>
+
+  <Accordion title="How do I check if a Shopify order is a subscription order?">
+    You can determine this directly from Shopify's Order API — no Appstle API call needed. Check the `sellingPlanAllocation` field on each line item.
+
+    **GraphQL query:**
+
+    ```graphql
+    {
+      order(id: "gid://shopify/Order/ORDER_ID") {
+        name
+        lineItems(first: 50) {
+          edges {
+            node {
+              title
+              quantity
+              sellingPlanAllocation {
+                sellingPlan {
+                  id
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
+    If `sellingPlanAllocation` is non-null, that line item is a subscription purchase. If it is null, it is a one-time purchase.
+
+    **Subscription line item:**
+    ```json
+    {
+      "title": "Premium Coffee Blend",
+      "quantity": 1,
+      "sellingPlanAllocation": {
+        "sellingPlan": {
+          "id": "gid://shopify/SellingPlan/123456789",
+          "name": "Deliver every 30 days"
+        }
+      }
+    }
+    ```
+
+    **One-time line item:**
+    ```json
+    {
+      "title": "Coffee Mug",
+      "quantity": 1,
+      "sellingPlanAllocation": null
+    }
+    ```
+
+    An order can contain both subscription and one-time line items. Always check each line item individually.
+
+    If you use the Shopify REST Admin API, the equivalent field is `selling_plan_allocation` on each line item in the Order resource.
+  </Accordion>
+
+  <Accordion title="Can customers manage their own subscriptions?">
+    Yes. Appstle provides a built-in customer portal that merchants can embed on their store's account page. Customers can:
+
+    - View active subscriptions
+    - Skip upcoming orders
+    - Pause or resume subscriptions
+    - Swap products or variants
+    - Update shipping address
+    - Change payment method
+    - Cancel subscriptions (subject to the merchant's configured rules)
+
+    The portal is configured in the Appstle admin and powered by the [Storefront API](/subscription/storefront-api). You can also build a fully custom portal using the Storefront API directly.
+  </Accordion>
+</AccordionGroup>
+
+## API & integration
+
+<AccordionGroup>
+  <Accordion title="How do I authenticate with the Admin API?">
+    Pass your API key in the `X-API-Key` header on every request:
+
+    ```bash
+    curl -H "X-API-Key: apst_your-api-key" \
+      "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/12345"
+    ```
+
+    Generate API keys in the Appstle admin under **Settings → API Key Management**. You can create up to 10 keys per store. See the [Authentication](/subscription/authentication) page for full details.
+  </Accordion>
+
+  <Accordion title="Do you support webhooks?">
+    Yes. Appstle supports real-time webhooks for all major subscription events:
+
+    - Subscription created, updated, activated, paused, cancelled
+    - Billing success, failure, skipped
+    - Upcoming order notifications
+    - Billing interval and next order date changes
+
+    Webhooks are powered by Svix and include signature verification, automatic retries, and delivery logs. Configure them in **Settings → Webhooks**. See the [Webhooks](/subscription/webhooks) page for full setup instructions.
+  </Accordion>
+
+  <Accordion title="What is a partner key and do I need one?">
+    A partner key (`X-App-Key`) is for companies building a product that integrates with Appstle on behalf of multiple merchants — for example a helpdesk, CRM, AI agent, or automation platform.
+
+    With a partner key, merchants using your integration do not need their own Appstle API subscription. Your application sends both the merchant's `X-API-Key` and your `X-App-Key` together.
+
+    If you are just building an integration for a single store you own, you only need a regular API key. See the [Authentication](/subscription/authentication) page for details on applying for a partner key.
+  </Accordion>
+
+  <Accordion title="Can I use the Storefront API from a mobile app?">
+    No. The Storefront API runs exclusively through Shopify's App Proxy and requires a logged-in browser session on your storefront domain. It cannot be called from mobile apps, backend servers, or any environment outside the storefront.
+
+    For mobile apps, use the [Admin API](/subscription/admin-api) with an `X-API-Key` header instead.
+  </Accordion>
+</AccordionGroup>
+
+## Data & privacy
+
+<AccordionGroup>
+  <Accordion title="Where is my data stored?">
+    All data is hosted on AWS (US-West-1, California) infrastructure with industry-standard security:
+
+    - TLS 1.2+ encryption in transit
+    - AES-256 encryption at rest (AWS KMS)
+    - VPC isolation and private subnets
+    - SOC, ISO, and PCI-DSS certified infrastructure
+  </Accordion>
+
+  <Accordion title="What happens to my data if I uninstall the app?">
+    All merchant and customer data associated with your store is deleted from Appstle's systems upon app uninstallation. Deletion is triggered automatically via Shopify's `app/uninstalled` webhook.
+  </Accordion>
+</AccordionGroup>
+
+## Still have questions?
+
+Contact [support@appstle.com](mailto:support@appstle.com) or explore the rest of the documentation:
+
+<CardGroup cols={2}>
+  <Card title="Integration guide" icon="book" href="/subscription/integration-guide">
+    Full walkthrough for building backend integrations.
+  </Card>
+  <Card title="Admin API reference" icon="code" href="/subscription/admin-api">
+    All available Admin API endpoints.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/subscription/webhooks">
+    Real-time event notifications setup and reference.
+  </Card>
+  <Card title="JavaScript hooks" icon="brackets-curly" href="/subscription/javascript-hooks">
+    Storefront widget events for custom UI and analytics.
+  </Card>
+</CardGroup>

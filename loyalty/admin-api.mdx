@@ -1,0 +1,429 @@
+---
+title: "Appstle Loyalty Admin API reference"
+description: "Reference for Appstle Loyalty Admin API endpoints: point management, customer enrollment, rewards, store credits, and program configuration. Requires X-API-Key."
+---
+
+The Admin API gives you server-side access to every aspect of your loyalty program. Use it to manage points, enroll customers, issue rewards, add store credits, and read program configuration. All endpoints require an `X-API-Key` header.
+
+**Base URL:** `https://loyalty-admin.appstle.com/api/external`
+
+**Authentication:** `X-API-Key: your-api-key`
+
+## Point management
+
+### GET /customer-loyalty
+
+Retrieve a customer's complete loyalty profile.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain (e.g., `your-store.myshopify.com`).
+</ParamField>
+
+<ParamField query="customer_id" type="string">
+  Shopify customer ID. Either `customer_id` or `customer_email` is required.
+</ParamField>
+
+<ParamField query="customer_email" type="string">
+  Customer email address. Either `customer_id` or `customer_email` is required.
+</ParamField>
+
+**Example request**
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/customer-loyalty?shop=your-store.myshopify.com&customer_id=12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+**Response fields**
+
+<ResponseField name="availablePoints" type="number">
+  Points the customer can redeem right now.
+</ResponseField>
+
+<ResponseField name="pendingPoints" type="number">
+  Points earned but not yet approved.
+</ResponseField>
+
+<ResponseField name="creditedPoints" type="number">
+  Total lifetime points ever credited.
+</ResponseField>
+
+<ResponseField name="storeCreditBalance" type="number">
+  Monetary store credit balance.
+</ResponseField>
+
+<ResponseField name="currentVipTier" type="string">
+  Active VIP tier name. Empty string if the customer has no tier.
+</ResponseField>
+
+<ResponseField name="customerStatus" type="string">
+  `ACTIVE` or `INACTIVE`.
+</ResponseField>
+
+<ResponseField name="referralLink" type="string">
+  The customer's unique referral URL.
+</ResponseField>
+
+<ResponseField name="referredCompleted" type="number">
+  Number of completed referrals attributed to this customer.
+</ResponseField>
+
+<ResponseField name="rewards" type="array">
+  Active and past reward objects. Each includes `description`, `discountCode`, `status` (`UNUSED`, `USED`, or `REFUNDED`), `createAt`, and `expireDate`.
+</ResponseField>
+
+---
+
+### GET /point-transaction-history/{customer_id}
+
+Retrieve a customer's full point transaction log.
+
+**Path parameters**
+
+<ParamField path="customer_id" type="string" required>
+  Shopify customer ID.
+</ParamField>
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/point-transaction-history/12345?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+---
+
+### POST /add-points
+
+Credit points to a customer's account.
+
+**Body parameters**
+
+<ParamField body="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+<ParamField body="customerId" type="number" required>
+  Shopify customer ID.
+</ParamField>
+
+<ParamField body="points" type="number" required>
+  Number of points to add.
+</ParamField>
+
+<ParamField body="note" type="string">
+  Optional note displayed in the customer's transaction history.
+</ParamField>
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/add-points" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "points": 100,
+    "note": "VIP welcome bonus"
+  }'
+```
+
+---
+
+### POST /redeem-points
+
+Convert a customer's points into a discount code using a configured redemption rule.
+
+**Body parameters**
+
+<ParamField body="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+<ParamField body="customerId" type="number" required>
+  Shopify customer ID.
+</ParamField>
+
+<ParamField body="pointRedeemRuleId" type="number" required>
+  ID of the redemption rule to apply. Retrieve valid IDs from `GET /point-redeem-rules`.
+</ParamField>
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/redeem-points" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "pointRedeemRuleId": 42
+  }'
+```
+
+---
+
+### PUT /approve-pending-transactions
+
+Move a customer's pending points to available. Use this when your program requires manual approval before points are redeemable.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+**Body parameters**
+
+<ParamField body="customerId" type="number" required>
+  Shopify customer ID.
+</ParamField>
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/approve-pending-transactions?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"customerId": 12345}'
+```
+
+---
+
+## Customer management
+
+### POST /enroll-customer
+
+Add a customer to the loyalty program. Call this before attempting to add points to a customer who has not yet joined.
+
+**Body parameters**
+
+<ParamField body="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+<ParamField body="customerId" type="number" required>
+  Shopify customer ID.
+</ParamField>
+
+<ParamField body="customerEmail" type="string" required>
+  Customer email address.
+</ParamField>
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/enroll-customer" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "customerEmail": "customer@example.com"
+  }'
+```
+
+---
+
+### PUT /update-customer-birth-date
+
+Set or update a customer's date of birth to enable birthday reward automation.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+**Body parameters**
+
+<ParamField body="customerId" type="number" required>
+  Shopify customer ID.
+</ParamField>
+
+<ParamField body="birthDate" type="string" required>
+  Date of birth in `YYYY-MM-DD` format.
+</ParamField>
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/update-customer-birth-date?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerId": 12345,
+    "birthDate": "1990-06-15"
+  }'
+```
+
+---
+
+### GET /top-customers
+
+Retrieve the highest-value loyalty members for your store, ranked by points.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/top-customers?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+---
+
+## Rewards and discounts
+
+### PUT /check-discount
+
+Validate a loyalty discount code before applying it at checkout. Returns validity, usage status, and the associated customer.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+**Body parameters**
+
+<ParamField body="discountCode" type="string" required>
+  The discount code to validate.
+</ParamField>
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/check-discount?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"discountCode": "REWARD-XXXX"}'
+```
+
+---
+
+### PUT /update-discount-code-status
+
+Mark a discount code as used after a customer applies it at checkout.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+**Body parameters**
+
+<ParamField body="discountCode" type="string" required>
+  The discount code to update.
+</ParamField>
+
+<ParamField body="status" type="string" required>
+  New status. Pass `"USED"` to mark the code as consumed.
+</ParamField>
+
+```bash
+curl -X PUT \
+  "https://loyalty-admin.appstle.com/api/external/update-discount-code-status?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "discountCode": "REWARD-XXXX",
+    "status": "USED"
+  }'
+```
+
+---
+
+## Store credits
+
+### POST /add-credits
+
+Add a monetary amount to a customer's store credit balance.
+
+**Body parameters**
+
+<ParamField body="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+<ParamField body="customerId" type="number" required>
+  Shopify customer ID.
+</ParamField>
+
+<ParamField body="credits" type="number" required>
+  Amount to add in the store's currency.
+</ParamField>
+
+<ParamField body="note" type="string">
+  Optional note displayed in the customer's credit history.
+</ParamField>
+
+```bash
+curl -X POST "https://loyalty-admin.appstle.com/api/external/add-credits" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop": "your-store.myshopify.com",
+    "customerId": 12345,
+    "credits": 10.00,
+    "note": "Goodwill credit"
+  }'
+```
+
+---
+
+## Program configuration
+
+### GET /point-earn-rules
+
+Retrieve all active point earn rules for your store. Use returned `id` values when calling `add-points` with a specific rule.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/point-earn-rules?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+---
+
+### GET /point-redeem-rules
+
+Retrieve all active redemption options. Use returned `id` values as `pointRedeemRuleId` when calling `redeem-points`.
+
+**Query parameters**
+
+<ParamField query="shop" type="string" required>
+  Your Shopify store domain.
+</ParamField>
+
+```bash
+curl -X GET \
+  "https://loyalty-admin.appstle.com/api/external/point-redeem-rules?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+---
+
+## HTTP status codes
+
+| Code | Meaning |
+|------|---------|
+| `200` | Request completed successfully |
+| `201` | Resource created |
+| `400` | Invalid request parameters |
+| `401` | Missing or invalid API key |
+| `403` | API key lacks required permissions |
+| `404` | Customer or resource not found |
+| `429` | Rate limit exceeded — implement exponential backoff |
+| `500` | Server error |

@@ -1,0 +1,147 @@
+---
+title: "Appstle Subscriptions Storefront API reference"
+sidebarTitle: "Storefront API"
+description: "Customer-facing Storefront API reference for subscription management, billing, product swaps, loyalty, and customization via Shopify App Proxy."
+---
+
+The Storefront API provides customer-facing endpoints for building custom subscription portals directly on your Shopify storefront. Unlike the Admin API, the Storefront API does not use API keys — it relies on the customer's active Shopify session and runs exclusively through the Shopify App Proxy.
+
+<Warning>
+  Storefront API endpoints must be called from your shop's domain with a logged-in customer session. They will not work with API key authentication and cannot be called from a backend server or mobile app. For those use cases, use the [Admin API](/subscription/admin-api) instead.
+</Warning>
+
+## How the Storefront API works
+
+Requests to the Storefront API are routed through Shopify's App Proxy. Shopify authenticates the customer session automatically — no credentials are needed in your code. The customer must be logged in to your Shopify storefront for the API to return data.
+
+Because of this, Storefront API endpoints are accessed via your store's own domain rather than a separate Appstle base URL.
+
+## Subscription management
+
+### Get customer's subscriptions
+
+Retrieve all subscription contracts for the currently logged-in customer.
+
+Returns active, paused, and cancelled subscriptions with product details, billing dates, and contract status.
+
+### Update subscription status
+
+Allow customers to pause, resume, or cancel their own subscriptions. Respects the merchant's configured cancellation rules and minimum cycle requirements.
+
+### Skip an upcoming order
+
+Let customers skip the next scheduled order for a subscription. The next billing date advances automatically.
+
+### Update billing date
+
+Allow customers to move their next billing date forward to better fit their schedule.
+
+## Contract details
+
+### View subscription details
+
+Display the full details of a subscription contract — products, quantities, pricing, billing schedule, shipping address, and payment method.
+
+### Update shipping address
+
+Allow customers to change the delivery address on an active subscription.
+
+### Update next billing date
+
+Let customers reschedule their next order without skipping it entirely.
+
+## Billing & orders
+
+### Update payment method
+
+Send the customer to Shopify's payment method update flow. The customer re-enters their payment details and the subscription contract is updated.
+
+### Get past orders
+
+Retrieve the billing history for a subscription — all past orders with dates, amounts, and statuses.
+
+### Get live order status
+
+Check the fulfillment status of a recent subscription order.
+
+## Product management
+
+### Swap a product
+
+Allow customers to replace one product in their subscription with another eligible variant. Useful for build-a-box subscriptions where customers choose their items each cycle.
+
+### Add a product to a subscription
+
+Let customers add an additional product to an existing subscription.
+
+### Remove a product from a subscription
+
+Allow customers to remove a product from their subscription.
+
+### Get subscription products
+
+Retrieve the catalog of products available for a given subscription, including selling plan allocations and pricing.
+
+### Get selling plans
+
+Return the available selling plans (subscription options) for a product, including frequencies and discount levels.
+
+## Loyalty & rewards
+
+### Get loyalty balance
+
+Retrieve the customer's current loyalty points balance.
+
+### Redeem loyalty points
+
+Apply loyalty points to a subscription order as a discount.
+
+### Get loyalty history
+
+View the customer's loyalty point earning and redemption history.
+
+## Customization
+
+### Get custom CSS
+
+Retrieve the merchant's custom CSS for the customer portal. Use this to inject styles when building a fully custom portal UI.
+
+### Get label translations
+
+Retrieve the merchant's configured label translations for the portal. Supports multi-language storefronts.
+
+## Using the Storefront API in your theme
+
+The Storefront API is designed to power custom subscription portal experiences on your Shopify storefront. Here is the typical pattern:
+
+<Steps>
+  <Step title="Ensure the customer is logged in">
+    Check that the current visitor has an active Shopify session before making API calls. Redirect to the login page if not.
+  </Step>
+  <Step title="Load subscription data on page load">
+    When your portal page loads, fetch the customer's subscriptions to populate the initial UI.
+  </Step>
+  <Step title="Handle customer actions">
+    Listen for button clicks (skip, pause, swap product, etc.) and call the appropriate Storefront API endpoint. Update the UI based on the response.
+  </Step>
+  <Step title="Handle errors gracefully">
+    Show user-friendly error messages when operations fail. Common reasons include minimum cycle requirements preventing cancellation, or out-of-stock products preventing a swap.
+  </Step>
+</Steps>
+
+## Storefront API vs. Admin API
+
+| Capability | Storefront API | Admin API |
+|------------|---------------|-----------|
+| Authentication | Customer session (logged in) | `X-API-Key` header |
+| Who calls it | Customer's browser (storefront) | Your server or backend |
+| Use case | Customer self-service portal | Backend integrations, automation |
+| Works from mobile apps | No | Yes |
+| Works from backend servers | No | Yes |
+| Respects merchant cancellation rules | Yes | Configurable |
+
+## Built-in customer portal
+
+If you prefer not to build a custom portal, Appstle provides a built-in customer portal that can be embedded on your store's account page. Configure it through your Appstle admin panel settings.
+
+To embed the built-in portal, add the portal embed code to your account page template. You can listen to the `AppstleSubscription:CustomerPortal:ReadyToEmbed` and `AppstleSubscription:CustomerPortal:Embedded` [JavaScript events](/subscription/javascript-hooks) to run custom logic around the embedding lifecycle.

@@ -1,0 +1,168 @@
+---
+title: "Get Started with Appstle Memberships API"
+description: "Go from zero to your first Memberships API response in minutes: create an API key, retrieve a customer's membership contracts, and check active status."
+---
+
+This guide walks you through the three steps you need to make your first successful Appstle Memberships API call: get an API key, retrieve membership contracts, and verify a customer's membership status.
+
+## Before you begin
+
+You need an active Appstle Memberships installation on your Shopify store. If you haven't installed the app yet, start in the Shopify App Store before continuing.
+
+## Step 1 — Create an API key
+
+<Steps>
+  <Step title="Open API Key Management">
+    In your Appstle admin panel, go to **Settings → API Key Management**.
+  </Step>
+  <Step title="Create a key">
+    Click **Create New Key**. Give it a name like `Quickstart Test` so you can identify it later.
+  </Step>
+  <Step title="Copy the key">
+    Your key is shown only once. Copy it now — you cannot retrieve the full value again after leaving this screen.
+
+    Your key will look like this:
+
+    ```
+    apst_AbCdEfGhIjKlMnOpQrStUvWxYz123456789012
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Never use your API key in client-side code or commit it to a public repository. Store it in an environment variable and read it at runtime.
+</Warning>
+
+## Step 2 — Retrieve membership contracts
+
+Use your new key to fetch all membership contracts for a customer. Replace `your-store.myshopify.com` with your store's Shopify domain and `12345` with a real Shopify customer ID.
+
+<CodeGroup>
+  ```bash cURL
+  curl -X GET \
+    "https://membership-admin.appstle.com/api/external/v2/membership-contracts?shop=your-store.myshopify.com&customerId=12345" \
+    -H "X-API-Key: apst_your-api-key-here"
+  ```
+
+  ```javascript Node.js
+  const res = await fetch(
+    'https://membership-admin.appstle.com/api/external/v2/membership-contracts' +
+    '?shop=your-store.myshopify.com&customerId=12345',
+    {
+      headers: { 'X-API-Key': process.env.APPSTLE_API_KEY },
+    }
+  );
+  const data = await res.json();
+  console.log(data);
+  ```
+
+  ```python Python
+  import requests, os
+
+  r = requests.get(
+      'https://membership-admin.appstle.com/api/external/v2/membership-contracts',
+      params={'shop': 'your-store.myshopify.com', 'customerId': '12345'},
+      headers={'X-API-Key': os.environ['APPSTLE_API_KEY']},
+  )
+  print(r.json())
+  ```
+</CodeGroup>
+
+A successful response looks like this:
+
+```json
+{
+  "content": [
+    {
+      "id": 1001,
+      "status": "ACTIVE",
+      "membershipPlanName": "Gold Member",
+      "nextBillingDate": "2026-03-01",
+      "billingCycleType": "MONTHLY",
+      "startDate": "2026-01-01",
+      "endDate": null
+    }
+  ],
+  "totalElements": 1
+}
+```
+
+The `content` array contains each membership contract for the customer. `totalElements` tells you how many contracts exist in total (useful for pagination).
+
+<Info>
+  If `content` is an empty array, the customer either has no memberships or no active ones. Try with a customer ID that you know has an active membership in your store.
+</Info>
+
+## Step 3 — Check member status
+
+To quickly verify whether a customer is an active member — for example, before granting access to gated content — call the membership status endpoint:
+
+<CodeGroup>
+  ```bash cURL
+  curl -X GET \
+    "https://membership-admin.appstle.com/api/external/v2/membership-status?shop=your-store.myshopify.com&customerId=12345" \
+    -H "X-API-Key: apst_your-api-key-here"
+  ```
+
+  ```javascript Node.js
+  const res = await fetch(
+    'https://membership-admin.appstle.com/api/external/v2/membership-status' +
+    '?shop=your-store.myshopify.com&customerId=12345',
+    {
+      headers: { 'X-API-Key': process.env.APPSTLE_API_KEY },
+    }
+  );
+  const status = await res.json();
+  ```
+
+  ```python Python
+  r = requests.get(
+      'https://membership-admin.appstle.com/api/external/v2/membership-status',
+      params={'shop': 'your-store.myshopify.com', 'customerId': '12345'},
+      headers={'X-API-Key': os.environ['APPSTLE_API_KEY']},
+  )
+  ```
+</CodeGroup>
+
+In your integration, check the contract `status` field from the contracts endpoint:
+
+```javascript
+const isActiveMember = data.content.some(contract => contract.status === 'ACTIVE');
+
+if (isActiveMember) {
+  // Grant access to gated content
+} else {
+  // Redirect to membership plan selection page
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="401 Unauthorized">
+    Your API key is invalid, missing, or was revoked. Double-check the `X-API-Key` header value. Make sure there is no extra whitespace and that the key belongs to the correct store.
+  </Accordion>
+  <Accordion title="400 Bad Request">
+    A required query parameter is missing or malformed. Confirm that `shop` is your full `.myshopify.com` domain and that `customerId` is a numeric Shopify customer ID.
+  </Accordion>
+  <Accordion title="Empty content array">
+    The customer exists but has no memberships. Use a different customer ID, or log in to your Appstle dashboard and confirm which customers have active contracts.
+  </Accordion>
+  <Accordion title="429 Too Many Requests">
+    You have exceeded the rate limit for your store. Implement exponential backoff and retry after a short delay.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Integration Guide" href="/memberships/integration-guide" icon="plug">
+    Full patterns for CRMs, email platforms, access control, and analytics integrations.
+  </Card>
+  <Card title="Webhooks" href="/memberships/webhooks" icon="webhook">
+    Receive real-time events when memberships are created, cancelled, or renewed.
+  </Card>
+  <Card title="Admin API Reference" href="/memberships/admin-api" icon="book">
+    Complete reference for all Admin API endpoints, parameters, and responses.
+  </Card>
+</CardGroup>

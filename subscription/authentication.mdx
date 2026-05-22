@@ -1,0 +1,135 @@
+---
+title: "Authenticate with the Appstle Subscriptions API"
+sidebarTitle: "Authentication"
+description: "Create and manage API keys in the Appstle dashboard, pass the X-API-Key header on every Admin API request, and use partner keys for third-party integrations."
+---
+
+Every Admin API request must include an API key. You generate keys in your Appstle dashboard — they are never transmitted over the wire in full after creation, so store them securely as soon as you create them.
+
+<Warning>
+  API keys are **server-side only**. Never include them in client-side JavaScript, mobile app source code, public repositories, or any environment where end users could inspect them.
+</Warning>
+
+## Creating an API key
+
+<Steps>
+  <Step title="Open API Key Management">
+    Log in to your Appstle admin panel and navigate to **Settings → API Key Management**.
+  </Step>
+  <Step title="Create a new key">
+    Click **Create New Key** and give it a descriptive name that identifies the integration it belongs to — for example, `Zapier Integration` or `Mobile App`.
+  </Step>
+  <Step title="Copy the key immediately">
+    The full key value is shown only once. Copy it now and store it in a secure location such as a secrets manager or environment variable store. You cannot retrieve it again after closing this dialog.
+  </Step>
+  <Step title="Add the key to your integration">
+    Set the key as an environment variable in your server environment and read it at runtime. Never hard-code it in source files.
+  </Step>
+</Steps>
+
+<Tip>
+  Create one key per integration rather than sharing a single key across systems. This lets you revoke access for one integration without disrupting the others.
+</Tip>
+
+## Sending the API key
+
+Include the key in the `X-API-Key` request header on every Admin API call:
+
+<CodeGroup>
+
+```bash curl
+curl -H "X-API-Key: apst_your-api-key-here" \
+  "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/12345"
+```
+
+```javascript Node.js
+const response = await fetch(
+  'https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/12345',
+  {
+    headers: {
+      'X-API-Key': process.env.APPSTLE_API_KEY,
+    },
+  }
+);
+```
+
+```python Python
+import os
+import requests
+
+response = requests.get(
+    'https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/12345',
+    headers={'X-API-Key': os.environ['APPSTLE_API_KEY']},
+)
+```
+
+</CodeGroup>
+
+API keys use the `apst_` prefix. Existing legacy keys (created before the prefix was introduced) continue to work without any migration.
+
+### Query parameter alternative
+
+You can also pass the key as a query parameter, though header-based authentication is recommended:
+
+```
+https://subscription-admin.appstle.com/api/external/v2/...?api_key=apst_your-api-key-here
+```
+
+## Managing keys
+
+From **Settings → API Key Management** you can:
+
+| Action | How |
+|--------|-----|
+| **Create** | Click "Create New Key". Up to 10 active keys per store. |
+| **Track** | Each key shows a last-used timestamp so you can identify stale keys. |
+| **Revoke** | Click the revoke button on any key to instantly disable it. Other keys are unaffected. |
+| **Rotate** | Create a new key first, update your integration to use it, then revoke the old key. This avoids downtime. |
+
+<Note>
+  Each store can have up to **10 active API keys**. If you need to create an 11th key, revoke an unused existing key first.
+</Note>
+
+## Partner integration keys
+
+If you are building a product that connects to Appstle on behalf of multiple merchants — for example a helpdesk, CRM, automation platform, or AI agent — you can apply for a **Partner Key**.
+
+Partner integrations use two headers:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-API-Key` | Merchant's API key | Identifies which store to act on |
+| `X-App-Key` | Your partner key | Identifies your application |
+
+```bash
+curl -H "X-API-Key: apst_merchant-api-key" \
+     -H "X-App-Key: your-partner-key" \
+     "https://subscription-admin.appstle.com/api/external/v2/subscription-customers/valid/12345"
+```
+
+**How the partner key flow works:**
+
+<Steps>
+  <Step title="Apply for a partner key">
+    Email [support@appstle.com](mailto:support@appstle.com) with your company name, product description, and expected API call volume per merchant. Partner keys are typically provisioned within 1–2 business days.
+  </Step>
+  <Step title="Receive your X-App-Key">
+    Appstle provisions a dedicated `X-App-Key` for your application. This key is the same across every merchant that uses your integration — keep it secret.
+  </Step>
+  <Step title="Merchants connect to your integration">
+    When a merchant wants to use your product, they create a dedicated API key in their Appstle dashboard (named after your integration) and paste it into your integration settings.
+  </Step>
+  <Step title="Send both headers on every request">
+    Your application sends `X-API-Key` (the merchant's key) and `X-App-Key` (your partner key) together with every request.
+  </Step>
+</Steps>
+
+<Info>
+  Partner integrations bypass the paid API plan requirement — merchants using your integration do not need their own Appstle API subscription to access your product's features.
+</Info>
+
+## Storefront API authentication
+
+The Storefront API does not use API keys. Instead, it relies on a customer's active Shopify session (the customer must be logged in to the storefront). Requests are routed through Shopify's App Proxy, which handles authentication automatically.
+
+See the [Storefront API reference](/subscription/storefront-api) for details.

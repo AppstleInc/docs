@@ -1,0 +1,345 @@
+---
+title: "Appstle Loyalty webhook events and setup"
+description: "Set up Appstle Loyalty webhooks to receive real-time notifications for point transactions, VIP tier changes, and referrals — with Svix signature verification."
+---
+
+Appstle Loyalty webhooks deliver real-time HTTP POST notifications to your endpoint whenever a loyalty event occurs. The webhook infrastructure is powered by [Svix](https://www.svix.com/), which provides automatic retries, cryptographic signature verification, and detailed delivery logs.
+
+<Note>
+  Webhooks are available on paid plans. Contact [support@appstle.com](mailto:support@appstle.com) to enable webhook access on your account.
+</Note>
+
+## Setting up an endpoint
+
+<Steps>
+  <Step title="Open webhook settings">
+    In your Appstle Loyalty admin, go to **Settings → Webhooks**.
+  </Step>
+  <Step title="Add an endpoint">
+    Click **Add Endpoint** and enter your publicly accessible HTTPS URL. Your endpoint must be reachable from the internet — localhost URLs will not work.
+  </Step>
+  <Step title="Choose events">
+    Select the event types you want to subscribe to, or subscribe to all events.
+  </Step>
+  <Step title="Save">
+    Click **Save**. Your endpoint will start receiving events immediately.
+  </Step>
+</Steps>
+
+<Warning>
+  Your endpoint must return a `2xx` status code within the timeout window. Return `200 OK` immediately and process the event asynchronously to avoid timeouts under load.
+</Warning>
+
+## How delivery works
+
+Each webhook is an HTTP POST request with a JSON body. Svix handles delivery with:
+
+- Automatic retries with exponential backoff (5 attempts over 3 days on failure)
+- Unique message IDs for idempotency
+- Signed request headers for verification
+- Delivery logs and manual replay from **Settings → Webhooks → Message Logs**
+
+## Event types
+
+| Event type | Description |
+|------------|-------------|
+| `loyalty.sign-up` | Customer joined the loyalty program |
+| `loyalty.earned` | Customer earned points for any activity |
+| `loyalty.redeemed` | Customer redeemed points for a reward |
+| `loyalty.credits-earned` | Customer earned store credits |
+| `loyalty.vip-tier-achieved` | Customer reached a new VIP tier |
+| `loyalty.birthday-trigger` | Customer's birthday reward was issued |
+| `loyalty.referral-reward` | Referring customer received a referral reward |
+| `loyalty.referred-reward` | Newly referred customer received their welcome reward |
+
+## Payload structure
+
+All events follow the same envelope:
+
+```json
+{
+  "type": "loyalty.earned",
+  "data": {
+    // event-specific payload
+  }
+}
+```
+
+### Common payload fields
+
+Every event's `data` object includes these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `customerId` | Number | Shopify customer ID |
+| `customerEmail` | String | Customer's email address |
+| `note` | String | Optional description of the event |
+| `points` | Number | Points involved (earned or redeemed amount) |
+| `earnRuleId` | Number | Earn rule ID that triggered points (`loyalty.earned` only) |
+| `redeemRuleId` | Number | Redemption rule ID used (`loyalty.redeemed` only) |
+| `webhookEventType` | String | Internal event type name |
+| `customerLoyaltyDetails` | Object | Full loyalty profile snapshot at the time of the event |
+
+### `customerLoyaltyDetails` fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `availablePoints` | Number | Current redeemable points balance |
+| `pendingPoints` | Number | Points awaiting approval |
+| `creditedPoints` | Number | Total lifetime points earned |
+| `spentAmount` | Number | Total amount spent by this customer |
+| `storeCreditBalance` | Number | Current store credit balance |
+| `currentVipTier` | String | Customer's current VIP tier name (empty if none) |
+| `vipTierExpiredAt` | DateTime | When the VIP tier expires (if applicable) |
+| `referralLink` | String | Customer's unique referral URL |
+| `referredCompleted` | Number | Number of completed referrals |
+| `dob` | Date | Date of birth in ISO 8601 format (if set) |
+| `rewards` | Array | Active and past reward objects |
+| `rewardedForFacebook` | Boolean | Facebook follow reward earned |
+| `rewardedForTwitter` | Boolean | X/Twitter follow reward earned |
+| `rewardedForInstagram` | Boolean | Instagram follow reward earned |
+| `rewardedForYoutube` | Boolean | YouTube subscribe reward earned |
+| `rewardedForTiktok` | Boolean | TikTok follow reward earned |
+| `rewardedForNewsLetter` | Boolean | Newsletter signup reward earned |
+| `rewardedForSms` | Boolean | SMS signup reward earned |
+| `rewardedForCreatingAccount` | Boolean | Account creation reward earned |
+| `rewardedForSharingOnFacebook` | Boolean | Facebook share reward earned |
+| `rewardedForSharingOnX` | Boolean | X/Twitter share reward earned |
+
+<Note>
+  Webhook payloads include additional fields (such as `storeCreditBalance`, `vipTierExpiredAt`, `rewardedForSharingOnFacebook`, and `rewardedForSharingOnX`) that are not available in the Shopify Flow GraphQL schema. Flow receives a subset of these fields.
+</Note>
+
+Each item in the `rewards` array contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `description` | String | Reward description |
+| `discountCode` | String | Generated Shopify discount code |
+| `status` | String | `UNUSED`, `USED`, or `REFUNDED` |
+| `pointTransactionId` | Number | Point transaction ID |
+| `pointRedeemRuleId` | Number | Redemption rule ID used |
+| `orderId` | String | Shopify order GID where reward was used |
+| `orderName` | String | Order name (e.g., `#1002`) |
+| `createAt` | DateTime | When the reward was created |
+| `usedAt` | DateTime | When the reward was used (if applicable) |
+| `expireDate` | DateTime | When the reward expires |
+| `variantId` | String | Shopify variant GID (for free product rewards) |
+
+## Example payloads
+
+<AccordionGroup>
+  <Accordion title="loyalty.sign-up — Customer joined the program">
+    ```json
+    {
+      "type": "loyalty.sign-up",
+      "data": {
+        "customerId": 12345,
+        "customerEmail": "member@example.com",
+        "note": "Welcome bonus applied",
+        "points": 100,
+        "earnRuleId": null,
+        "redeemRuleId": null,
+        "customerLoyaltyDetails": {
+          "availablePoints": 100,
+          "pendingPoints": 0,
+          "creditedPoints": 100,
+          "spentAmount": 0,
+          "storeCreditBalance": 0,
+          "currentVipTier": "",
+          "referralLink": "https://your-store.myshopify.com?ref=abc123",
+          "referredCompleted": 0,
+          "rewards": [],
+          "rewardedForCreatingAccount": true
+        }
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="loyalty.earned — Customer earned points">
+    ```json
+    {
+      "type": "loyalty.earned",
+      "data": {
+        "customerId": 12345,
+        "customerEmail": "member@example.com",
+        "note": "Purchase reward",
+        "points": 250,
+        "earnRuleId": 7,
+        "redeemRuleId": null,
+        "customerLoyaltyDetails": {
+          "availablePoints": 850,
+          "pendingPoints": 0,
+          "creditedPoints": 1100,
+          "spentAmount": 320.00,
+          "currentVipTier": "Silver",
+          "referralLink": "https://your-store.myshopify.com?ref=abc123",
+          "referredCompleted": 2,
+          "rewards": []
+        }
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="loyalty.redeemed — Customer redeemed points for a reward">
+    ```json
+    {
+      "type": "loyalty.redeemed",
+      "data": {
+        "customerId": 12345,
+        "customerEmail": "member@example.com",
+        "note": null,
+        "points": 500,
+        "earnRuleId": null,
+        "redeemRuleId": 3,
+        "customerLoyaltyDetails": {
+          "availablePoints": 350,
+          "creditedPoints": 1100,
+          "currentVipTier": "Silver",
+          "rewards": [
+            {
+              "description": "$5 off your next order",
+              "discountCode": "REWARD-XXXXX",
+              "status": "UNUSED",
+              "pointRedeemRuleId": 3,
+              "createAt": "2026-02-15T10:30:00Z",
+              "expireDate": "2026-05-15T00:00:00Z"
+            }
+          ]
+        }
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="loyalty.vip-tier-achieved — Customer reached a new tier">
+    ```json
+    {
+      "type": "loyalty.vip-tier-achieved",
+      "data": {
+        "customerId": 12345,
+        "customerEmail": "member@example.com",
+        "note": "Reached Gold tier",
+        "points": 0,
+        "customerLoyaltyDetails": {
+          "availablePoints": 2100,
+          "creditedPoints": 5000,
+          "spentAmount": 1250.00,
+          "currentVipTier": "Gold",
+          "vipTierExpiredAt": "2027-01-01T00:00:00Z"
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Signature verification
+
+Every webhook request is signed by Svix. Always verify the signature before processing.
+
+Svix includes three headers on every request:
+
+| Header | Description |
+|--------|-------------|
+| `svix-id` | Unique message ID — use as an idempotency key |
+| `svix-timestamp` | Unix timestamp of delivery |
+| `svix-signature` | HMAC-SHA256 signature |
+
+Find your **webhook signing secret** in your Appstle dashboard under **Settings → Webhooks → [your endpoint]**.
+
+<CodeGroup>
+
+```javascript Node.js
+const { Webhook } = require('svix');
+
+const secret = 'whsec_your_signing_secret';
+
+app.post('/webhooks/appstle-loyalty', express.raw({ type: 'application/json' }), (req, res) => {
+  const wh = new Webhook(secret);
+  let event;
+
+  try {
+    event = wh.verify(req.body, {
+      'svix-id': req.headers['svix-id'],
+      'svix-timestamp': req.headers['svix-timestamp'],
+      'svix-signature': req.headers['svix-signature'],
+    });
+  } catch (err) {
+    return res.status(400).send('Signature verification failed');
+  }
+
+  const { customerId, points, customerLoyaltyDetails } = event.data;
+
+  switch (event.type) {
+    case 'loyalty.vip-tier-achieved':
+      // Send VIP welcome email, add Shopify customer tag
+      break;
+    case 'loyalty.referral-reward':
+      // Notify referrer of their reward
+      break;
+    case 'loyalty.earned':
+      // Sync points balance to CRM
+      break;
+  }
+
+  res.status(200).send('OK');
+});
+```
+
+```python Python
+from svix.webhooks import Webhook, WebhookVerificationError
+
+secret = "whsec_your_signing_secret"
+
+@app.route('/webhooks/appstle-loyalty', methods=['POST'])
+def webhook():
+    try:
+        wh = Webhook(secret)
+        event = wh.verify(request.data, {
+            "svix-id": request.headers.get("svix-id"),
+            "svix-timestamp": request.headers.get("svix-timestamp"),
+            "svix-signature": request.headers.get("svix-signature"),
+        })
+    except WebhookVerificationError:
+        return "Verification failed", 400
+
+    if event["type"] == "loyalty.vip-tier-achieved":
+        tier = event["data"]["customerLoyaltyDetails"]["currentVipTier"]
+        # handle tier upgrade
+
+    return "OK", 200
+```
+
+</CodeGroup>
+
+<Warning>
+  Pass the **raw request body** to the verification function before JSON parsing. Parsing the body first alters the byte representation and will cause verification to fail.
+</Warning>
+
+For Go, Ruby, PHP, Java, and C# examples, see the [Svix documentation](https://docs.svix.com/receiving/verifying-payloads/how).
+
+## Idempotency
+
+Webhooks may be delivered more than once due to network conditions or retries. Use the `svix-id` header as an idempotency key to safely deduplicate events in your handler.
+
+## Retry schedule
+
+If your endpoint returns a non-`2xx` response or times out, Svix retries with exponential backoff across 5 attempts over 3 days. View delivery attempts and replay individual events from **Settings → Webhooks → Message Logs**.
+
+## Local development
+
+Use a tunneling tool such as ngrok to expose your local server during development:
+
+```bash
+ngrok http 3000
+# Add https://your-id.ngrok.io/webhooks/appstle-loyalty as your endpoint in the dashboard
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Signature verification fails | Use the raw request body before JSON parsing. Confirm you are using the correct secret from the dashboard. |
+| Not receiving events | Confirm webhooks are enabled under Settings and your account plan includes webhook access. |
+| Endpoint timing out | Return `200 OK` immediately and process events in a background job or queue. |
+| Duplicate events | Use the `svix-id` header as an idempotency key and skip already-processed IDs. |

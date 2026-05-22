@@ -1,0 +1,223 @@
+---
+title: "Appstle Memberships Third-Party Integration Guide"
+description: "Integrate with Appstle Memberships: authentication, base URL, membership management, member data, access control, billing, and common integration patterns."
+---
+
+This guide covers everything you need to build a robust integration with Appstle Memberships. It includes authentication setup, the key endpoints for common workflows, and practical patterns for CRMs, email platforms, access control systems, and analytics tools.
+
+## Authentication
+
+### Merchant API key
+
+For direct API access, pass the merchant's API key in every request header:
+
+```
+X-API-Key: <merchant-api-key>
+```
+
+Merchants create and manage API keys in the Appstle dashboard under **Settings → API Key Management**. Each key is scoped to a single Shopify store and can be individually revoked.
+
+<Info>
+  Direct API access requires an active API plan. Contact [support@appstle.com](mailto:support@appstle.com) for pricing.
+</Info>
+
+### Partner key
+
+If you are building a product that integrates with Appstle Memberships — a CRM, helpdesk, email platform, or automation tool — you can apply for a **Partner Key**. Partner integrations bypass the paid plan requirement entirely.
+
+```
+X-API-Key: <merchant-api-key>
+X-App-Key: <your-partner-key>
+```
+
+- **`X-API-Key`** — The merchant's API key, entered by the merchant in your integration settings
+- **`X-App-Key`** — Your partner key, provisioned by Appstle once during onboarding — the same key for all merchants using your integration
+
+To apply, email [support@appstle.com](mailto:support@appstle.com) with your company name, product description, and expected API volume.
+
+## Base URL
+
+```
+https://membership-admin.appstle.com
+```
+
+All external endpoints are prefixed with `/api/external/v2/`.
+
+## Membership management
+
+### List membership contracts for a customer
+
+Retrieve all membership contracts for a specific customer. This is the most common first call in any integration.
+
+```bash
+curl -X GET \
+  "https://membership-admin.appstle.com/api/external/v2/membership-contracts?shop=your-store.myshopify.com&customerId=12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "content": [
+    {
+      "id": 1001,
+      "status": "ACTIVE",
+      "membershipPlanName": "Gold Member",
+      "nextBillingDate": "2026-03-01",
+      "billingCycleType": "MONTHLY",
+      "startDate": "2026-01-01",
+      "endDate": null
+    }
+  ],
+  "totalElements": 1
+}
+```
+
+### Check membership status
+
+Quickly verify whether a customer is an active member before granting access to gated content or applying member discounts:
+
+```bash
+curl -X GET \
+  "https://membership-admin.appstle.com/api/external/v2/membership-status?shop=your-store.myshopify.com&customerId=12345" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Get a specific contract
+
+Retrieve full details for a single membership contract by its ID:
+
+```bash
+curl -X GET \
+  "https://membership-admin.appstle.com/api/external/v2/membership-contracts/{contractId}?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### List membership plans
+
+Retrieve all membership plans available in a store:
+
+```bash
+curl -X GET \
+  "https://membership-admin.appstle.com/api/external/v2/membership-plans?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Billing operations
+
+### Cancel a membership
+
+Cancel a customer's membership programmatically:
+
+```bash
+curl -X POST \
+  "https://membership-admin.appstle.com/api/external/v2/membership-contracts/{contractId}/cancel?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Customer requested cancellation via support ticket"}'
+```
+
+### Pause a membership
+
+Pause a membership contract:
+
+```bash
+curl -X POST \
+  "https://membership-admin.appstle.com/api/external/v2/membership-contracts/{contractId}/pause?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+### Resume a paused membership
+
+Reactivate a membership that was previously paused:
+
+```bash
+curl -X POST \
+  "https://membership-admin.appstle.com/api/external/v2/membership-contracts/{contractId}/resume?shop=your-store.myshopify.com" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Common integration patterns
+
+<AccordionGroup>
+  <Accordion title="CRM / Helpdesk (Gorgias, Zendesk, HubSpot)">
+    Help agents verify and manage memberships directly while handling support tickets:
+
+    1. Look up member status by customer ID from the Shopify customer context
+    2. Display active plan name, billing date, and contract status in the agent sidebar
+    3. Cancel, pause, or update memberships directly from the helpdesk with a single API call
+    4. Log actions back for audit trail purposes
+
+    **Key endpoints:** `GET /membership-contracts`, `GET /membership-status`, `POST /{contractId}/cancel`, `POST /{contractId}/pause`
+  </Accordion>
+  <Accordion title="Email / SMS Platform (Klaviyo, Omnisend)">
+    Sync membership data for lifecycle automations:
+
+    1. Use [webhooks](/memberships/webhooks) to receive real-time membership events (`membership.created`, `membership.cancelled`, etc.)
+    2. Enrich customer profiles with membership tier, plan name, and next billing date
+    3. Trigger flows based on events:
+       - `membership.billing-failure` → "Update your payment method" dunning sequence
+       - `membership.cancelled` → Win-back offer sequence
+       - `membership.created` → Welcome onboarding sequence
+       - `membership.expired` → Re-engagement campaign
+
+    **Key endpoints:** `GET /membership-contracts`, webhook events
+  </Accordion>
+  <Accordion title="Access Control / Gated Content">
+    Control access to content, pages, or products based on active membership:
+
+    1. On page load, call the membership status endpoint from your server-side code
+    2. Check that `status === "ACTIVE"` and that the plan grants access to the requested resource
+    3. Gate or unlock accordingly — redirect non-members to the plan selection page
+    4. Cache membership status per session to stay within rate limits
+
+    **Key endpoints:** `GET /membership-status`, `GET /membership-contracts`
+  </Accordion>
+  <Accordion title="Analytics / BI Tools">
+    Pull membership data for reporting and revenue projections:
+
+    1. Use the membership contracts list endpoint with pagination to export all contracts
+    2. Filter by `status` to track active vs. churned members
+    3. Use `nextBillingDate` and `billingCycleType` for MRR/ARR projections
+    4. Combine with [webhook events](/memberships/webhooks) to track churn in real time
+
+    **Key endpoints:** `GET /membership-contracts` (paginated), `GET /membership-plans`, webhook events
+  </Accordion>
+</AccordionGroup>
+
+## Rate limits
+
+API requests are rate-limited per store. If you receive a `429 Too Many Requests` response, implement exponential backoff before retrying. Cache membership status per customer session where possible to reduce the number of API calls.
+
+## Response format
+
+All responses use standard HTTP status codes:
+
+| Status | Meaning |
+|--------|---------|
+| `200` | Success |
+| `201` | Created |
+| `400` | Bad Request — invalid parameters |
+| `401` | Unauthorized — invalid or missing API key |
+| `403` | Forbidden — key lacks permission |
+| `404` | Not Found |
+| `429` | Too Many Requests — rate limit exceeded |
+| `500` | Server Error |
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Webhooks" href="/memberships/webhooks" icon="webhook">
+    Receive real-time event notifications for membership lifecycle and billing events.
+  </Card>
+  <Card title="Shopify Flow" href="/memberships/shopify-flow" icon="bolt">
+    Automate membership workflows without writing code using Shopify Flow triggers.
+  </Card>
+  <Card title="Admin API Reference" href="/memberships/admin-api" icon="book">
+    Complete endpoint documentation with parameters and response schemas.
+  </Card>
+  <Card title="Metafields & Tags" href="/memberships/metafields-and-tags" icon="tag">
+    Shopify metafields and customer tags used for membership access control.
+  </Card>
+</CardGroup>

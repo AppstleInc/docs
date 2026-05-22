@@ -1,0 +1,276 @@
+---
+title: "Customer Portal API: Storefront Membership Self-Service"
+description: "Customer Portal API reference for Appstle Memberships: lets logged-in members view their plan, manage access, and use gated content via Shopify App Proxy."
+---
+
+The Customer Portal API powers member-facing self-service experiences on your Shopify storefront. It is delivered through Shopify's App Proxy, which means it operates within the logged-in customer's session — no API keys are involved, and it is only accessible from your storefront.
+
+Use this API when you are building a custom member portal in your theme, adding membership management to a customer account page, or creating gated content experiences that require an active membership.
+
+<Warning>
+  The Customer Portal API is for storefront use via Shopify App Proxy only. The customer must be logged in to your store. If you need to access membership data from outside your storefront — such as a mobile app, backend service, or third-party integration — use the [Admin API](/memberships/admin-api) with a valid API key instead.
+</Warning>
+
+## How it works
+
+Shopify's App Proxy routes requests from your storefront to Appstle's servers, automatically injecting the logged-in customer's session. Your theme makes requests to the proxy URL, and Appstle responds with membership data scoped to that customer.
+
+The proxy URL format is:
+
+```
+/apps/appstle-memberships/{endpoint}
+```
+
+All Customer Portal API requests are made relative to this base path from your storefront JavaScript or Liquid templates.
+
+## Authentication
+
+No API key is required. Authentication is handled entirely by Shopify's App Proxy using the customer's active storefront session.
+
+<Note>
+  If the customer is not logged in, App Proxy requests will return a `401 Unauthorized` response. Ensure your theme checks for a logged-in session before rendering membership content or calling these endpoints.
+</Note>
+
+## Membership plan — view current plan
+
+Returns the current membership contract details for the logged-in customer, including plan name, status, next billing date, and billing interval.
+
+```
+GET /apps/appstle-memberships/customer-portal/membership
+```
+
+**Example (storefront JavaScript):**
+
+```javascript
+const response = await fetch('/apps/appstle-memberships/customer-portal/membership', {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+const membership = await response.json();
+```
+
+**Example response:**
+
+```json
+{
+  "id": 1001,
+  "status": "ACTIVE",
+  "membershipPlanName": "Gold Member",
+  "nextBillingDate": "2026-03-01",
+  "billingCycleType": "MONTHLY",
+  "startDate": "2026-01-01",
+  "currentPrice": {
+    "amount": "29.00",
+    "currencyCode": "USD"
+  }
+}
+```
+
+<ResponseField name="id" type="integer">
+  Numeric ID of the membership contract.
+</ResponseField>
+<ResponseField name="status" type="string">
+  Current membership status: `ACTIVE`, `PAUSED`, `CANCELLED`, or `EXPIRED`.
+</ResponseField>
+<ResponseField name="membershipPlanName" type="string">
+  Display name of the plan (e.g., "Gold Member").
+</ResponseField>
+<ResponseField name="nextBillingDate" type="string">
+  ISO 8601 date of the next renewal billing.
+</ResponseField>
+<ResponseField name="billingCycleType" type="string">
+  Billing frequency: `MONTHLY`, `ANNUAL`, or a custom interval.
+</ResponseField>
+<ResponseField name="currentPrice" type="object">
+  Object with `amount` (string) and `currencyCode` (string) fields.
+</ResponseField>
+
+## Manage membership
+
+### Cancel membership
+
+Cancels the logged-in customer's active membership. The cancellation takes effect based on the store's `immediateTagRemoveOnCancel` setting — either immediately or at the end of the current billing period.
+
+```
+POST /apps/appstle-memberships/customer-portal/membership/cancel
+```
+
+**Example:**
+
+```javascript
+const response = await fetch('/apps/appstle-memberships/customer-portal/membership/cancel', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    reason: 'No longer needed',
+  }),
+});
+const result = await response.json();
+```
+
+<ParamField body="reason" type="string">
+  Optional cancellation reason provided by the customer. Recorded in the contract's activity log.
+</ParamField>
+
+### Pause membership
+
+Pauses the logged-in customer's active membership.
+
+```
+POST /apps/appstle-memberships/customer-portal/membership/pause
+```
+
+**Example:**
+
+```javascript
+const response = await fetch('/apps/appstle-memberships/customer-portal/membership/pause', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+});
+```
+
+### Resume membership
+
+Reactivates a paused membership.
+
+```
+POST /apps/appstle-memberships/customer-portal/membership/resume
+```
+
+**Example:**
+
+```javascript
+const response = await fetch('/apps/appstle-memberships/customer-portal/membership/resume', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+});
+```
+
+## Gated content access
+
+Check whether the logged-in customer has access to a specific piece of gated content based on their active membership tier.
+
+```
+GET /apps/appstle-memberships/customer-portal/access
+```
+
+<ParamField query="collectionId" type="string">
+  Shopify collection GID to check access for (e.g., `gid://shopify/Collection/123`).
+</ParamField>
+<ParamField query="productId" type="string">
+  Shopify product GID to check access for (e.g., `gid://shopify/Product/456`).
+</ParamField>
+
+**Example:**
+
+```javascript
+const params = new URLSearchParams({ collectionId: 'gid://shopify/Collection/123' });
+const response = await fetch(
+  `/apps/appstle-memberships/customer-portal/access?${params}`,
+  { method: 'GET' }
+);
+const access = await response.json();
+
+if (access.hasAccess) {
+  // Show gated content
+} else {
+  // Show upgrade prompt
+}
+```
+
+**Example response:**
+
+```json
+{
+  "hasAccess": true,
+  "membershipTier": "gold-member",
+  "membershipPlanName": "Gold Member"
+}
+```
+
+<ResponseField name="hasAccess" type="boolean">
+  `true` if the customer's active membership tier grants access to the requested resource.
+</ResponseField>
+<ResponseField name="membershipTier" type="string">
+  The customer tag of the plan granting access (e.g., `gold-member`).
+</ResponseField>
+<ResponseField name="membershipPlanName" type="string">
+  Display name of the plan granting access.
+</ResponseField>
+
+## Using the API in Liquid themes
+
+You can call these endpoints from Liquid using the `{% javascript %}` section of your theme, or from inline `<script>` blocks on customer account pages.
+
+**Check access on page load:**
+
+```html
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const response = await fetch('/apps/appstle-memberships/customer-portal/membership');
+    
+    if (response.ok) {
+      const membership = await response.json();
+      
+      if (membership.status === 'ACTIVE') {
+        document.getElementById('gated-content').style.display = 'block';
+        document.getElementById('membership-plan-name').textContent = membership.membershipPlanName;
+      } else {
+        document.getElementById('upgrade-prompt').style.display = 'block';
+      }
+    } else {
+      // Customer not logged in or no membership
+      document.getElementById('upgrade-prompt').style.display = 'block';
+    }
+  });
+</script>
+```
+
+## Error responses
+
+| Status | Meaning |
+|--------|---------|
+| `401` | Customer is not logged in or session has expired |
+| `404` | No membership found for this customer |
+| `429` | Rate limit exceeded |
+| `500` | Server error — contact support@appstle.com |
+
+## Comparison with the Admin API
+
+<Tabs>
+  <Tab title="Customer Portal API">
+    - Accessed from your Shopify storefront only
+    - Authenticated via Shopify App Proxy (customer session)
+    - No API key required
+    - Returns data scoped to the logged-in customer
+    - Suitable for: custom member portals, account pages, gated content in themes
+  </Tab>
+  <Tab title="Admin API">
+    - Accessed from your server, mobile app, or backend
+    - Authenticated via `X-API-Key` header
+    - Can retrieve and manage any customer's membership
+    - Full access to all Admin API capabilities
+    - Suitable for: CRM integrations, automation, analytics, mobile apps
+  </Tab>
+</Tabs>
+
+## Related resources
+
+<CardGroup cols={2}>
+  <Card title="Admin API Reference" href="/memberships/admin-api" icon="server">
+    Server-side API for managing memberships from your backend or integrations.
+  </Card>
+  <Card title="Metafields & Tags" href="/memberships/metafields-and-tags" icon="tag">
+    How membership customer tags power storefront access gating via Liquid.
+  </Card>
+  <Card title="Integration Guide" href="/memberships/integration-guide" icon="plug">
+    Patterns for building gated content, CRM integrations, and email automation.
+  </Card>
+  <Card title="Webhooks" href="/memberships/webhooks" icon="webhook">
+    React to membership events in real time from your backend.
+  </Card>
+</CardGroup>

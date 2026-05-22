@@ -1,0 +1,226 @@
+---
+title: "Shopify Flow triggers and actions for Appstle Loyalty"
+description: "Automate loyalty with Appstle's native Shopify Flow triggers and actions. Award points, assign VIP tiers, and issue store credits — no API code required."
+---
+
+Appstle Loyalty integrates natively with Shopify Flow, giving you 8 event triggers and 6 actions. You can automate loyalty workflows entirely within Shopify's no-code automation builder — no webhooks or API calls required.
+
+## Triggers
+
+Triggers fire when loyalty events occur in Appstle and pass customer and loyalty data into your Flow workflow.
+
+| Trigger | Handle | Description |
+|---------|--------|-------------|
+| Loyalty Sign Up | `loyalty-sign-up` | Customer joins the loyalty program |
+| Loyalty Points Earned | `loyalty-points-earned` | Customer earns loyalty points |
+| Loyalty Points Redeemed | `loyalty-points-redeemed` | Customer redeems points for a reward |
+| Loyalty Credits Earned | `loyalty-credits-earned` | Customer earns store credits |
+| Loyalty VIP Tier Achieved | `loyalty-vip-tier-achieved` | Customer reaches a new VIP tier |
+| Customer's Birthday | `birthday-trigger` | Triggered on the customer's birth date |
+| Referral Reward Created | `referral-reward-created` | A reward is created for the referring customer |
+| Referred Reward Created | `referred-reward-created` | A reward is created for the referred customer |
+
+### Trigger properties
+
+All triggers include a `customer_reference` (Shopify customer reference) and a `Note` string describing the activity.
+
+The three points and credits triggers (`loyalty-points-earned`, `loyalty-points-redeemed`, `loyalty-credits-earned`) additionally include:
+- `Points` or `Credits` — the decimal amount earned or redeemed
+- `Earn Rule ID` or `Redeem Rule ID` — the rule that triggered the activity
+
+Every trigger also carries a nested **Customer Loyalty Details** object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `availablePoints` | Float | Current redeemable points balance |
+| `pendingPoints` | Float | Points awaiting approval |
+| `creditedPoints` | Float | Total lifetime points earned |
+| `spentAmount` | Float | Total amount spent by the customer |
+| `currentVipTier` | String | Active VIP tier name (empty if none) |
+| `referredCompleted` | Int | Number of completed referrals |
+| `referralLink` | String | Customer's unique referral URL |
+| `dob` | String | Date of birth in ISO format (if set) |
+| `rewardedForFacebook` | Boolean | Facebook like reward earned |
+| `rewardedForTwitter` | Boolean | X/Twitter follow reward earned |
+| `rewardedForInstagram` | Boolean | Instagram follow reward earned |
+| `rewardedForYoutube` | Boolean | YouTube subscribe reward earned |
+| `rewardedForTiktok` | Boolean | TikTok follow reward earned |
+| `rewardedForNewsLetter` | Boolean | Newsletter signup reward earned |
+| `rewardedForSms` | Boolean | SMS signup reward earned |
+| `rewardedForCreatingAccount` | Boolean | Account creation reward earned |
+| `rewards` | Array | List of `CustomerReward` objects |
+
+Each item in the `rewards` array contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `description` | String | Reward description |
+| `discountCode` | String | Generated Shopify discount code |
+| `status` | RewardStatus | `USED`, `UNUSED`, or `REFUNDED` |
+| `pointTransactionId` | Int | Internal transaction ID |
+| `pointRedeemRuleId` | Int | Redemption rule ID |
+| `orderId` | ID | Shopify order ID (if reward was used) |
+| `orderName` | String | Order name (e.g., `#1002`) |
+| `createAt` | String | Creation timestamp |
+| `usedAt` | String | Timestamp when used (if applicable) |
+| `expireDate` | String | Expiry timestamp |
+| `variantId` | ID | Product variant ID (for free product rewards) |
+
+<Note>
+  The Flow schema exposes a subset of fields from the full customer loyalty object. Fields such as `storeCreditBalance`, `vipTierExpiredAt`, `rewardedForSharingOnFacebook`, and `rewardedForSharingOnX` are present in webhook payloads but are not available in Shopify Flow.
+</Note>
+
+## Actions
+
+Actions let your Flow workflows modify loyalty data in Appstle.
+
+| Action | Handle | Description |
+|--------|--------|-------------|
+| Add Points | `add-points` | Award loyalty points to a customer |
+| Remove Points | `remove-points` | Deduct loyalty points from a customer |
+| Add Store Credits | `add-store-credits` | Award store credits to a customer |
+| Remove Store Credits | `remove-store-credits` | Deduct store credits from a customer |
+| Reward Points for Reviews | `reward-points-for-reviews` | Award points for a product review submission |
+| Assign VIP Tier | `assign-vip-tier` | Assign or change a customer's VIP tier |
+
+### Add Points
+
+| Field | Key | Type | Required | Description |
+|-------|-----|------|----------|-------------|
+| Customer Identifier | `customer-identifier` | String | Yes | Customer ID or email — use `{{customer.email}}` |
+| Points To Add | `pointsToAdd` | String | No | Number of points to award |
+| Rule Id | `rule-id` | Integer | No | Static rule ID from Appstle Loyalty |
+| Reason | `reason` | String | Yes | Shown to the customer in their transaction history |
+
+<Warning>
+  The `points` (Decimal) field is deprecated. Use `pointsToAdd` instead. If you see the old field in an existing action, remove and re-add the action block to get the current version.
+</Warning>
+
+### Remove Points
+
+| Field | Key | Type | Required | Description |
+|-------|-----|------|----------|-------------|
+| Customer | — | `customer_reference` | Yes | Shopify customer reference |
+| Points To Remove | `pointsToRemove` | String | Yes | Number of points to deduct |
+| Reason | `reason` | String | Yes | Shown to the customer |
+
+### Add Store Credits
+
+| Field | Key | Type | Required | Description |
+|-------|-----|------|----------|-------------|
+| Customer | — | `customer_reference` | Yes | Shopify customer reference |
+| Store Credits To Add | `storeCreditsToAdd` | String | Yes | Amount in store currency |
+| Reason | `reason` | String | Yes | Shown to the customer |
+
+### Remove Store Credits
+
+| Field | Key | Type | Required | Description |
+|-------|-----|------|----------|-------------|
+| Customer | — | `customer_reference` | Yes | Shopify customer reference |
+| Store Credits To Remove | `storeCreditsToRemove` | String | Yes | Amount to deduct |
+| Reason | `reason` | String | Yes | Shown to the customer |
+
+### Reward Points for Reviews
+
+Use this action to automatically award points when a review is submitted through a supported platform.
+
+| Field | Key | Type | Required | Description |
+|-------|-----|------|----------|-------------|
+| Customer Email | `customer-email` | String | Yes | Use the customer email variable from your trigger |
+| Product ID | `product-id` | String | Yes | Product ID variable from your trigger |
+| Rating | `review-rating` | String | Yes | Review rating value |
+| Review Type | `review-type` | String | Yes | Platform identifier (see below) |
+| Images Count | `image-count` | String | No | Number of images attached to the review |
+| Videos Count | `video-count` | String | No | Number of videos attached to the review |
+
+Supported `review-type` values:
+
+```
+REVIEWS_IO
+AIR_REVIEWS
+OKENDO
+LEAVE_REVIEW_LOOX_IO
+LEAVE_REVIEW_STAMPED_IO
+LEAVE_REVIEW_PRODUCT_REVIEWS
+```
+
+### Assign VIP Tier
+
+| Field | Key | Type | Required | Description |
+|-------|-----|------|----------|-------------|
+| Customer Identifier | `customer-identifier` | String | Yes | Customer ID or email |
+| VIP Tier Name | `vip-tier-name` | String | Yes | Exact name of the tier as configured in Appstle |
+| Lock Tier | `lock-tier` | String | No | Set to `"true"` to prevent automatic recalculation from changing the tier. Default `"false"`. |
+| Reason | `reason` | String | No | Reason recorded in the audit log |
+
+<Note>
+  The tier name must exactly match a VIP tier configured in your Appstle Loyalty settings — for example, `"Gold"` or `"Silver"`. If the customer is already on the specified tier, no changes are made.
+</Note>
+
+## Pre-built Flow templates
+
+Appstle provides ready-to-use Flow templates for common review platform integrations:
+
+| Template | Review platform |
+|----------|----------------|
+| Points for Reviews.io | Reviews.io |
+| Points for Okendo Reviews | Okendo |
+| Points for Loox Reviews | Loox |
+| Points for Air Reviews | Air Reviews |
+| Points for Rivyo Reviews | Rivyo |
+
+Install a template from the Shopify Flow template library and it will be pre-configured with the correct action fields for that platform.
+
+## Example workflows
+
+<AccordionGroup>
+  <Accordion title="Send a welcome email on sign-up">
+    ```
+    Trigger: Loyalty Sign Up
+      ↓
+    Action: Send email marketing
+      Customer Email: {{customer.email}}
+      Subject: "Welcome to our loyalty program"
+    ```
+  </Accordion>
+  <Accordion title="Tag customers when they reach Gold tier">
+    ```
+    Trigger: Loyalty VIP Tier Achieved
+      Condition: currentVipTier equals "Gold"
+      ↓
+    Action: Add customer tags
+      Tags: "vip-gold"
+    ```
+  </Accordion>
+  <Accordion title="Award birthday points">
+    ```
+    Trigger: Customer's Birthday
+      ↓
+    Action: Add Points
+      Customer Identifier: {{customer.email}}
+      Points To Add: 100
+      Reason: "Happy Birthday bonus"
+    ```
+  </Accordion>
+  <Accordion title="Assign VIP tier through Flow">
+    ```
+    Trigger: Any trigger or condition
+      ↓
+    Action: Assign VIP Tier
+      Customer Identifier: {{customer.email}}
+      VIP Tier Name: "Gold"
+      Reason: "Upgraded via Shopify Flow"
+    ```
+  </Accordion>
+  <Accordion title="Award points for an Okendo review">
+    ```
+    Trigger: Okendo review submitted (via Okendo Flow trigger)
+      ↓
+    Action: Reward Points for Reviews
+      Customer Email: {{customer.email}}
+      Product ID: {{product.id}}
+      Rating: {{review.rating}}
+      Review Type: "OKENDO"
+    ```
+  </Accordion>
+</AccordionGroup>

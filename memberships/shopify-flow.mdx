@@ -1,0 +1,161 @@
+---
+title: "Automate Memberships with Shopify Flow Triggers"
+description: "Automate membership workflows with Appstle's Shopify Flow triggers: tag customers, send emails, and update CRMs on lifecycle and billing events."
+---
+
+Appstle Memberships integrates natively with Shopify Flow, Shopify's built-in automation platform. You can automate membership operations — send emails, tag customers, update CRMs, trigger Slack alerts, and more — without writing any code.
+
+Flow actions run within Shopify's authenticated context, so there is no need for API tokens or credentials. This makes Flow the most secure and straightforward way to automate membership operations.
+
+## Getting started
+
+<Steps>
+  <Step title="Enable the Flow integration">
+    In your Appstle Memberships admin, go to **Settings → Integrations → Shopify Flow** and enable it.
+  </Step>
+  <Step title="Open the Shopify Flow editor">
+    Navigate to the [Shopify Flow editor](https://admin.shopify.com/store/YOUR_STORE/apps/flow) in your Shopify admin.
+  </Step>
+  <Step title="Create a workflow">
+    Click **Create workflow**, then select an Appstle Memberships trigger to start. All membership triggers appear under the Appstle Memberships app in the trigger picker.
+  </Step>
+</Steps>
+
+<Note>
+  Shopify Flow is available on Shopify Basic plan and above. All Flow trigger events are logged in the membership's Activity Log with source `SYSTEM_EVENT`.
+</Note>
+
+## Membership lifecycle triggers
+
+These triggers fire automatically when membership contracts change state. All lifecycle triggers include a full set of membership and customer properties.
+
+| Trigger | Handle | Description |
+|---------|--------|-------------|
+| Membership Created | `membership-created` | A new membership contract is created. Includes the `order_id` of the originating order. |
+| Membership Updated | `membership-updated` | Membership details are modified, such as address or custom attributes. |
+| Membership Activated | `membership-activated` | A paused or new membership becomes active. |
+| Membership Paused | `membership-paused` | Membership is put on pause. |
+| Membership Cancelled | `membership-cancelled` | Membership is cancelled. |
+| Membership Expired | `membership-expired` | Membership expires, or perks are removed for cancelled/paused memberships. |
+| Membership Swap Product | `membership-swap-product` | The product or plan in a membership is changed. |
+| Next Order Date Changed | `next-order-date-changed` | The next renewal date is rescheduled. |
+| Billing Interval Changed | `billing-interval-changed` | Billing frequency is updated, for example monthly to annual. |
+
+## Billing triggers
+
+| Trigger | Handle | Description |
+|---------|--------|-------------|
+| Membership Billing Success | `membership-billing-success` | Renewal payment processed successfully. Includes the new order ID. |
+| Membership Billing Failure | `membership-billing-failure` | Renewal payment failed. Use this to trigger dunning emails or pause logic. |
+
+<Warning>
+  The `membership-billing-failure` trigger fires on every failed attempt — not just the first one. Use the `Billing Attempt Count` property to distinguish first failures from retries so you don't send duplicate emails to the same customer.
+</Warning>
+
+## Trigger properties
+
+All triggers include the following properties:
+
+### Membership properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Membership ID` | Number | Internal membership contract ID |
+| `Status` | String | Current status: `ACTIVE`, `PAUSED`, `CANCELLED`, `EXPIRED`, `FAILED` |
+| `Next Billing Date` | DateTime | ISO 8601 next renewal date |
+| `Billing Interval` | String | Billing frequency unit: `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `Billing Interval Count` | Number | Number of intervals between renewals (e.g., `1` for monthly, `12` for annual) |
+| `Membership Selling Plan Name` | String | Name of the membership plan (e.g., "Gold Member — Monthly") |
+| `Membership Selling Plan ID` | Number | Shopify selling plan ID |
+| `product_id` | Number | Shopify product ID for the membership product |
+| `Variant ID` | Number | Shopify product variant ID |
+| `Original Order ID` | Number | Order ID that created the membership |
+| `Original Order Name` | String | Order name (e.g., "#1001") |
+
+### Customer properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `customer_id` | Number | Shopify customer ID |
+| `Customer Email` | String | Customer's email address |
+| `Customer Phone` | String | Customer's phone number |
+| `Customer Display Name` | String | Customer's full display name |
+| `Customer First Name` | String | Customer's first name |
+| `Customer Last Name` | String | Customer's last name |
+
+### Billing event properties
+
+The **Membership Billing Success** and **Membership Billing Failure** triggers include these additional fields:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Billing Attempt Status` | String | `SUCCESS` or `FAILURE` |
+| `Billing Attempt ID` | Number | Shopify billing attempt ID |
+| `Billing Date` | DateTime | Scheduled billing date (ISO 8601) |
+| `Billing Attempt Time` | DateTime | Actual attempt timestamp (ISO 8601) |
+| `Billing Attempt Count` | Number | How many times billing has been attempted for this cycle |
+
+The **Membership Billing Success** trigger also includes:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `order_id` | Number | Shopify order ID created by the successful renewal |
+| `Recurring Order ID` | Number | Same as `order_id` |
+| `Recurring Order Name` | String | Order name (e.g., "#1002") |
+
+## Example workflows
+
+<AccordionGroup>
+  <Accordion title="Send a welcome email on new membership">
+    **Trigger:** Membership Created
+
+    **Action:** Klaviyo / Omnisend / Shopify Email — send "Welcome to the membership" email
+
+    Use `Customer Email` as the recipient and `Membership Selling Plan Name` to personalize the plan name in the email body.
+  </Accordion>
+  <Accordion title="Tag customers by membership tier">
+    **Trigger:** Membership Updated
+
+    **Condition:** `Membership Selling Plan Name` contains `"Gold"`
+
+    **Action:** Shopify — Add customer tag `gold-member`
+
+    This pattern lets you apply tier-specific tags automatically as members upgrade or switch plans.
+  </Accordion>
+  <Accordion title="Trigger a dunning flow on billing failure">
+    **Trigger:** Membership Billing Failure
+
+    **Condition:** `Billing Attempt Count` equals `1` (first failure only)
+
+    **Action:** Klaviyo — Trigger "Update Payment Method" flow
+
+    Pass `Customer Email` and `Membership ID` as variables to the email template.
+  </Accordion>
+  <Accordion title="Pause account access on cancellation">
+    **Trigger:** Membership Cancelled
+
+    **Action 1:** Shopify — Add customer tag `membership-cancelled`
+
+    **Action 2:** Klaviyo — Send "We're sorry to see you go" email with a win-back offer
+  </Accordion>
+  <Accordion title="Log renewals in your CRM">
+    **Trigger:** Membership Billing Success
+
+    **Action:** Salesforce / HubSpot (via Flow connector) — Log renewal event
+
+    Use `order_id`, `Customer Email`, and `Membership Selling Plan Name` as the data payload.
+  </Accordion>
+  <Accordion title="Alert your team on membership expiry">
+    **Trigger:** Membership Expired
+
+    **Action:** Slack — Send message to `#membership-churn` channel
+
+    Include `Customer Display Name`, `Customer Email`, and `Membership Selling Plan Name` in the message body.
+  </Accordion>
+</AccordionGroup>
+
+## Notes
+
+- Imported membership contracts do not fire `membership-created`. Only contracts created through the Shopify checkout flow trigger this event.
+- Flow integration must be enabled in **Settings → Integrations** before any triggers will fire.
+- All Flow trigger events appear in the membership Activity Log with source `SYSTEM_EVENT`.

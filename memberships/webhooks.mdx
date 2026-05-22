@@ -1,0 +1,315 @@
+---
+title: "Membership Webhook Events and Signature Verification"
+description: "Receive real-time membership lifecycle and billing event notifications via webhooks. Covers Svix signature verification, automatic retries, and idempotency."
+---
+
+Appstle Memberships webhooks deliver real-time HTTP notifications to your server whenever a membership event occurs. Webhooks are powered by [Svix](https://www.svix.com/) — enterprise-grade infrastructure with automatic retries, cryptographic signature verification, and detailed delivery monitoring.
+
+## Getting started
+
+<Steps>
+  <Step title="Open webhook settings">
+    In your Appstle Memberships admin, go to **Settings → Webhooks**.
+  </Step>
+  <Step title="Add an endpoint">
+    Click **Add Endpoint** and enter your HTTPS endpoint URL.
+  </Step>
+  <Step title="Select events">
+    Choose which events you want to receive, or subscribe to all events to ensure you never miss one.
+  </Step>
+  <Step title="Save">
+    Your endpoint will start receiving events immediately after saving.
+  </Step>
+</Steps>
+
+<Note>
+  Webhooks are available on paid plans. Contact [support@appstle.com](mailto:support@appstle.com) to enable access.
+</Note>
+
+## How webhooks work
+
+Webhooks are HTTP `POST` requests sent to your endpoint whenever a membership event occurs. Your endpoint must:
+
+- Be publicly accessible via HTTPS
+- Return a `2xx` status code within the timeout window
+- Process events asynchronously — queue them for background processing, then respond immediately
+
+Svix provides automatic retries with exponential backoff, cryptographic signature verification, detailed delivery logs, and the ability to replay events from your dashboard.
+
+## Event types
+
+### Membership lifecycle events
+
+| Event | Description |
+|-------|-------------|
+| `membership.created` | New membership contract created |
+| `membership.updated` | Membership details modified |
+| `membership.activated` | Membership activated |
+| `membership.paused` | Membership paused |
+| `membership.cancelled` | Membership cancelled |
+| `membership.expired` | Membership expired at end of term |
+| `membership.swap-product` | Product or plan in membership changed |
+| `membership.next-order-date-changed` | Next renewal date rescheduled |
+| `membership.billing-interval-changed` | Billing frequency changed |
+
+### Billing events
+
+| Event | Description |
+|-------|-------------|
+| `membership.billing-success` | Renewal payment processed successfully |
+| `membership.billing-failure` | Renewal payment failed |
+
+## Payload structure
+
+All webhooks share this top-level structure:
+
+```json
+{
+  "type": "membership.created",
+  "data": {}
+}
+```
+
+The `data` field contains the event-specific payload.
+
+### Membership contract payload
+
+The lifecycle events `membership.created`, `membership.updated`, `membership.activated`, `membership.paused`, `membership.cancelled`, `membership.expired`, `membership.swap-product`, `membership.next-order-date-changed`, and `membership.billing-interval-changed` all deliver a full membership contract object:
+
+```json
+{
+  "type": "membership.created",
+  "data": {
+    "id": "gid://shopify/SubscriptionContract/12345",
+    "createdAt": "2026-01-15T10:30:00Z",
+    "updatedAt": "2026-01-15T10:30:00Z",
+    "nextBillingDate": "2026-02-15",
+    "status": "ACTIVE",
+    "billingPolicy": {
+      "interval": "MONTH",
+      "intervalCount": 1,
+      "anchors": [],
+      "maxCycles": 12,
+      "minCycles": 1
+    },
+    "deliveryPolicy": {
+      "interval": "MONTH",
+      "intervalCount": 1,
+      "anchors": []
+    },
+    "lines": {
+      "nodes": [
+        {
+          "id": "gid://shopify/SubscriptionLine/67890",
+          "productId": "gid://shopify/Product/11111",
+          "variantId": "gid://shopify/ProductVariant/22222",
+          "sellingPlanId": "gid://shopify/SellingPlan/33333",
+          "sellingPlanName": "Gold Member — Monthly",
+          "title": "Gold Membership",
+          "variantTitle": "Monthly",
+          "quantity": 1,
+          "currentPrice": {
+            "amount": "29.00",
+            "currencyCode": "USD"
+          }
+        }
+      ]
+    },
+    "customer": {
+      "id": "gid://shopify/Customer/55555",
+      "email": "member@example.com",
+      "displayName": "Jane Doe",
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "phone": "+1-555-123-4567"
+    },
+    "originOrder": {
+      "id": "gid://shopify/Order/77777",
+      "name": "#1001"
+    },
+    "deliveryPrice": {
+      "amount": "0.00",
+      "currencyCode": "USD"
+    },
+    "lastPaymentStatus": "SUCCEEDED",
+    "note": null,
+    "customAttributes": []
+  }
+}
+```
+
+### Billing success payload
+
+```json
+{
+  "type": "membership.billing-success",
+  "data": {
+    "id": 98765,
+    "shop": "example-store.myshopify.com",
+    "billingAttemptId": "gid://shopify/SubscriptionBillingAttempt/99999",
+    "contractId": 12345,
+    "status": "SUCCESS",
+    "billingDate": "2026-02-15T00:00:00Z",
+    "attemptTime": "2026-02-15T10:30:00Z",
+    "attemptCount": 1,
+    "orderId": 77778,
+    "orderName": "#1002",
+    "orderAmount": 29.00,
+    "retryingNeeded": false,
+    "billingAttemptResponseMessage": null
+  }
+}
+```
+
+### Billing failure payload
+
+```json
+{
+  "type": "membership.billing-failure",
+  "data": {
+    "id": 98766,
+    "shop": "example-store.myshopify.com",
+    "billingAttemptId": "gid://shopify/SubscriptionBillingAttempt/99998",
+    "contractId": 12345,
+    "status": "FAILURE",
+    "billingDate": "2026-03-15T00:00:00Z",
+    "attemptTime": "2026-03-15T10:30:00Z",
+    "attemptCount": 1,
+    "orderId": null,
+    "orderName": null,
+    "orderAmount": null,
+    "retryingNeeded": true,
+    "billingAttemptResponseMessage": "INVALID_PAYMENT_METHOD: The payment method is invalid."
+  }
+}
+```
+
+Common `billingAttemptResponseMessage` values:
+
+| Value | Meaning |
+|-------|---------|
+| `INVALID_PAYMENT_METHOD` | Payment method is expired or invalid |
+| `INSUFFICIENT_FUNDS` | Insufficient account balance |
+| `CARD_DECLINED` | Card declined by issuer |
+| `AUTHENTICATION_REQUIRED` | Customer must re-authenticate their payment method |
+| `EXPIRED_PAYMENT_METHOD` | Payment method has expired |
+
+## Signature verification
+
+Every webhook request is signed by Svix. Always verify the signature before processing the payload — this ensures the request genuinely came from Appstle and has not been tampered with.
+
+Svix includes three headers on every request:
+
+| Header | Description |
+|--------|-------------|
+| `svix-id` | Unique message ID — use as an idempotency key |
+| `svix-timestamp` | Unix timestamp of when the message was sent |
+| `svix-signature` | HMAC-SHA256 signature |
+
+Find your **webhook signing secret** in your Appstle dashboard under **Settings → Webhooks → [your endpoint]**.
+
+<CodeGroup>
+  ```javascript Node.js
+  const { Webhook } = require('svix');
+
+  const secret = 'whsec_your_signing_secret';
+
+  app.post('/webhooks/appstle-memberships', express.raw({ type: 'application/json' }), (req, res) => {
+    const wh = new Webhook(secret);
+    let event;
+
+    try {
+      event = wh.verify(req.body, {
+        'svix-id': req.headers['svix-id'],
+        'svix-timestamp': req.headers['svix-timestamp'],
+        'svix-signature': req.headers['svix-signature'],
+      });
+    } catch (err) {
+      return res.status(400).send('Webhook signature verification failed');
+    }
+
+    switch (event.type) {
+      case 'membership.created':
+        // Handle new membership
+        break;
+      case 'membership.billing-failure':
+        // Trigger dunning flow
+        break;
+      case 'membership.cancelled':
+        // Revoke member access
+        break;
+    }
+
+    res.status(200).send('OK');
+  });
+  ```
+
+  ```python Python
+  from svix.webhooks import Webhook, WebhookVerificationError
+
+  secret = "whsec_your_signing_secret"
+
+  @app.route('/webhooks/appstle-memberships', methods=['POST'])
+  def webhook():
+      headers = {
+          "svix-id": request.headers.get("svix-id"),
+          "svix-timestamp": request.headers.get("svix-timestamp"),
+          "svix-signature": request.headers.get("svix-signature"),
+      }
+      try:
+          wh = Webhook(secret)
+          event = wh.verify(request.data, headers)
+      except WebhookVerificationError:
+          return "Verification failed", 400
+
+      if event["type"] == "membership.billing-failure":
+          # trigger dunning logic
+          pass
+
+      return "OK", 200
+  ```
+</CodeGroup>
+
+<Warning>
+  Pass the **raw request body** to the signature verification function — before JSON parsing. Parsing the body first will cause verification to fail because the byte representation changes.
+</Warning>
+
+For Ruby, Go, PHP, Java, and C# examples, see the [Svix documentation](https://docs.svix.com/receiving/verifying-payloads/how).
+
+## Retry schedule
+
+If your endpoint returns a non-`2xx` status code or times out, Svix retries with exponential backoff across 5 attempts over 3 days. You can view delivery history and manually replay events from your Appstle dashboard under **Settings → Webhooks → Message Logs**.
+
+## Idempotency
+
+Webhooks can be delivered more than once. Use the `svix-id` header value as an idempotency key to safely deduplicate events in your database before processing.
+
+```javascript
+const messageId = req.headers['svix-id'];
+
+const alreadyProcessed = await db.processedEvents.exists({ id: messageId });
+if (alreadyProcessed) {
+  return res.status(200).send('OK'); // already handled
+}
+
+await db.processedEvents.create({ id: messageId });
+// ... process the event
+```
+
+## Local development
+
+Use [ngrok](https://ngrok.com/) to expose your local server for webhook testing:
+
+```bash
+ngrok http 3000
+# Then add https://your-id.ngrok.io/webhooks/appstle-memberships as your endpoint
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|---------|
+| Signature verification fails | Use the raw request body before JSON parsing. Verify you are using the correct signing secret from the dashboard. |
+| Endpoint timing out | Return `200 OK` immediately, then process the event asynchronously in a background job or queue. |
+| Not receiving events | Confirm the webhook integration is enabled in Settings and that your endpoint is publicly accessible via HTTPS. |
+| Duplicate events | Use the `svix-id` header as a deduplication key before processing. |

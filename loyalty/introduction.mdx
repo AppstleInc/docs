@@ -1,0 +1,127 @@
+---
+title: "Appstle Loyalty: Points, VIP Tiers & Referrals"
+description: "Appstle Loyalty provides Admin and Storefront REST APIs to build points programs, VIP tiers, and referrals on Shopify. Learn which API fits your use case."
+---
+
+Appstle Loyalty is a complete loyalty and rewards platform for Shopify stores. It exposes two REST APIs — the **Admin API** for backend integrations, mobile apps, and automated workflows, and the **Storefront API** for customer-facing experiences delivered through Shopify's App Proxy. Together they let you build anything from simple points programs to multi-tier VIP schemes with referrals, reviews, and store credits.
+
+## What you can build
+
+<Columns cols={2}>
+  <Card title="Point management" icon="coins">
+    Credit and debit points for purchases, reviews, social actions, birthdays, and custom activities. Access full transaction history.
+  </Card>
+  <Card title="VIP tiers" icon="crown">
+    Define spend or points thresholds for Bronze, Silver, Gold, Platinum, or any tier structure. Automatically promote and demote customers.
+  </Card>
+  <Card title="Referral program" icon="user-plus">
+    Generate unique referral links, track accepted referrals, and reward both the referrer and the referred customer.
+  </Card>
+  <Card title="Product reviews" icon="star">
+    Let customers submit reviews and earn points. Display ratings via Shopify metafields compatible with native rich results.
+  </Card>
+  <Card title="Store credits" icon="wallet">
+    Issue monetary store credit as an alternative to discount codes. Balances are tracked separately from loyalty points.
+  </Card>
+  <Card title="Rewards & discounts" icon="tag">
+    Convert points into Shopify discount codes. Validate and mark codes as used from your own checkout flow.
+  </Card>
+</Columns>
+
+## Choosing the right API
+
+<Tabs>
+  <Tab title="Admin API">
+    The Admin API is authenticated with an API key and called server-side. Use it for:
+
+    - Backend integrations and automated workflows
+    - Mobile applications (iOS and Android)
+    - Admin dashboards and reporting tools
+    - Bulk operations and third-party system integrations
+    - Any request made outside your storefront
+
+    **Base URL:** `https://loyalty-admin.appstle.com`
+
+    **Authentication:** `X-API-Key` header
+
+    <Warning>
+      Never call the Admin API from client-side JavaScript or expose your API key in a browser. All Admin API requests must originate from a server you control.
+    </Warning>
+  </Tab>
+  <Tab title="Storefront API">
+    The Storefront API is delivered through Shopify's App Proxy and authenticates using the customer's existing Shopify session. Use it for:
+
+    - Custom loyalty portals embedded in your theme
+    - Self-service point earning and redemption widgets
+    - Referral program pages
+    - Customer-facing review submission forms
+
+    **Authentication:** Logged-in customer session (via App Proxy)
+
+    <Note>
+      Storefront APIs only work from your shop's domain with a logged-in customer. They cannot be called with an API key. For any integration outside the storefront, use the Admin API instead.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Key concepts
+
+<AccordionGroup>
+  <Accordion title="Points lifecycle">
+    Points move through three states: **pending** (earned but awaiting approval), **available** (redeemable), and **credited** (total lifetime points earned). Your program configuration determines whether points are credited immediately or held in a pending state for review.
+  </Accordion>
+  <Accordion title="VIP tiers">
+    Tiers are assigned automatically when a customer crosses a configured spend or points threshold. Each tier can carry a name tag and any number of additional Shopify customer tags. Tags are swapped automatically on tier changes — there is always at most one active tier per customer.
+  </Accordion>
+  <Accordion title="Referrals">
+    Every enrolled customer receives a unique referral link. When a referred customer makes a qualifying purchase, both parties receive rewards as defined in your referral configuration. Referral relationships are recorded permanently as Shopify customer tags.
+  </Accordion>
+  <Accordion title="Store credits">
+    Store credits are a monetary balance separate from points. They are applied at checkout and tracked in `storeCreditBalance` on the customer loyalty profile. Credits can be issued via the Admin API or through Shopify Flow.
+  </Accordion>
+  <Accordion title="Partner integrations">
+    Third-party apps (helpdesks, CRMs, review platforms, email tools) can connect to Appstle Loyalty through the Partner Integration Framework. Partners receive a scoped API token per merchant with no manual key exchange. Merchants connect and disconnect with one click.
+  </Accordion>
+</AccordionGroup>
+
+## Response format
+
+All API responses use standard HTTP status codes.
+
+| Code | Meaning |
+|------|---------|
+| `200` | Request completed successfully |
+| `201` | Resource created |
+| `400` | Invalid request parameters |
+| `401` | Missing or invalid API key |
+| `403` | API key lacks required permissions |
+| `404` | Resource not found |
+| `429` | Rate limit exceeded — use exponential backoff |
+| `500` | Server error |
+
+Error responses follow this structure:
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid API key provided",
+  "status": 401
+}
+```
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/loyalty/quickstart">
+    Get your API key, make your first request, and add points in under 5 minutes.
+  </Card>
+  <Card title="Authentication" icon="key" href="/loyalty/authentication">
+    Learn how to create and manage API keys and authenticate every request.
+  </Card>
+  <Card title="Integration guide" icon="plug" href="/loyalty/integration-guide">
+    Full walkthrough of every endpoint category with working curl examples.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/loyalty/webhooks">
+    Receive real-time notifications for points, tier changes, and referrals.
+  </Card>
+</Columns>

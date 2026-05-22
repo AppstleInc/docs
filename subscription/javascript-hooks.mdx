@@ -1,0 +1,124 @@
+---
+title: "JavaScript events for the Appstle storefront widget"
+sidebarTitle: "JavaScript hooks"
+description: "Listen to DOM events fired by the Appstle subscription widget, cart, customer portal, and Build-a-Box to add analytics, custom UI, and storefront integrations."
+---
+
+Appstle Subscriptions dispatches JavaScript events from `appstle-subscription.js`, which is automatically injected into your storefront when the app is installed. You can listen to these events to track subscription interactions in analytics tools, show or hide custom UI, and react to customer actions in the cart and portal.
+
+All events are dispatched on both `document` and `window`, so you can attach listeners to either.
+
+```javascript
+document.addEventListener('AppstleSubscription:SubscriptionWidget:SellingPlanSelected', function(event) {
+  console.log('Selling plan selected, widget ID:', event.detail);
+});
+```
+
+<Info>
+  These events are dispatched by `appstle-subscription.js`, which loads automatically on your storefront once the Appstle Subscriptions app is installed. No additional configuration is required to start listening.
+</Info>
+
+## Subscription widget events
+
+These events fire when customers interact with the subscription widget on product pages.
+
+| Event name | Fires when | `event.detail` |
+|------------|------------|----------------|
+| `AppstleSubscription:SubscriptionWidget:widgetInitialised` | Widget loads on a product page | Widget ID |
+| `AppstleSubscription:SubscriptionWidget:SubscriptionWidgetUpdated` | Widget is re-rendered (e.g. on variant change) | Widget ID |
+| `AppstleSubscription:SubscriptionWidget:SellingPlanSelected` | Customer selects a subscription option | Widget ID |
+| `AppstleSubscription:SubscriptionWidget:SellingPlanRemoved` | Subscription selling plan is removed from cart | Widget ID |
+| `AppstleSubscription:SubscriptionWidget:SellingPlanDeSelected` | Customer switches away from subscription | Widget ID |
+| `AppstleSubscription:SubscriptionWidget:sellingPlanChanged` | Customer changes the selling plan (frequency, etc.) | Selling Plan ID |
+| `appstle_widget_updated` | Widget DOM is updated (jQuery event on `document`) | — |
+
+## Cart widget events
+
+| Event name | Fires when | `event.detail` |
+|------------|------------|----------------|
+| `AppstleSubscription:CartWidget:Updated` | Cart widget is updated | — |
+| `AppstleSubscription:SubscriptionWidget:SwitchedToOneTime` | Customer switches a cart item from subscription to one-time | Line item key |
+| `AppstleSubscription:SubscriptionWidget:SwitchedToSubscription` | Customer switches a cart item from one-time to subscription | Line item key |
+
+## Customer portal events
+
+| Event name | Fires when | `event.detail` |
+|------------|------------|----------------|
+| `AppstleSubscription:CustomerPortal:ReadyToEmbed` | Customer portal is ready to be embedded | — |
+| `AppstleSubscription:CustomerPortal:Embedded` | Customer portal has been embedded in the page | — |
+
+## Build-a-Box events
+
+| Event name | Fires when | `event.detail` |
+|------------|------------|----------------|
+| `AppstleSubscription:Bab:Embedded` | Build-a-Box widget has been embedded | — |
+| `appstleBundlesAppliedVolumeDiscount:request` | Volume discount is requested for bundles | `true` |
+
+## Other events
+
+| Event name | Fires when | `event.detail` |
+|------------|------------|----------------|
+| `OpenAppstleContracts` | Request to open the contracts/subscriptions view | — |
+
+## Code examples
+
+### Track subscription selections in analytics
+
+```javascript
+document.addEventListener('AppstleSubscription:SubscriptionWidget:SellingPlanSelected', function(event) {
+  // Google Analytics 4
+  gtag('event', 'subscription_selected', {
+    widget_id: event.detail
+  });
+});
+```
+
+### Show custom UI when the widget loads
+
+```javascript
+document.addEventListener('AppstleSubscription:SubscriptionWidget:widgetInitialised', function(event) {
+  const banner = document.querySelector('.my-custom-subscription-banner');
+  if (banner) {
+    banner.style.display = 'block';
+  }
+});
+```
+
+### React to cart subscription changes
+
+```javascript
+document.addEventListener('AppstleSubscription:SubscriptionWidget:SwitchedToSubscription', function(event) {
+  console.log('Item switched to subscription, line item key:', event.detail);
+  // Update custom cart UI, apply promotions, etc.
+});
+
+document.addEventListener('AppstleSubscription:SubscriptionWidget:SwitchedToOneTime', function(event) {
+  console.log('Item switched to one-time, line item key:', event.detail);
+});
+```
+
+### Run custom logic around customer portal embedding
+
+```javascript
+document.addEventListener('AppstleSubscription:CustomerPortal:ReadyToEmbed', function() {
+  // Run setup logic before the portal renders
+  console.log('Customer portal is ready to embed');
+});
+
+document.addEventListener('AppstleSubscription:CustomerPortal:Embedded', function() {
+  // Run post-render logic, e.g. hide a loading spinner
+  const loader = document.querySelector('.portal-loader');
+  if (loader) loader.remove();
+});
+```
+
+### Track selling plan changes
+
+```javascript
+document.addEventListener('AppstleSubscription:SubscriptionWidget:sellingPlanChanged', function(event) {
+  const newSellingPlanId = event.detail;
+  console.log('Customer changed to selling plan:', newSellingPlanId);
+
+  // Update UI to reflect new frequency/discount
+});
+```
